@@ -23,8 +23,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 . "$HOME/.cargo/env"
 
 # 3. JS dependencies + app icons
-npm install
-npm run icon          # generates app-icon.png and all platform icons
+pnpm install
+pnpm run icon         # generates app-icon.png and all platform icons
 ```
 
 > Setup needs the network once. The finished app runs **fully offline**.
@@ -32,8 +32,8 @@ npm run icon          # generates app-icon.png and all platform icons
 ## Run
 
 ```bash
-npm run tauri:dev     # dev build with hot reload
-npm run tauri:build   # production bundle (AppImage / .deb)
+pnpm tauri:dev        # dev build with hot reload
+pnpm tauri:build      # production bundle (AppImage / .deb)
 ```
 
 The dev/build scripts set `WEBKIT_DISABLE_DMABUF_RENDERER=1` so the WebView
@@ -42,8 +42,8 @@ renders correctly under **WSLg** (otherwise the window may appear blank).
 ## Test
 
 ```bash
-npm test              # vitest — iCal parse/serialize roundtrip
-npm run check         # svelte-check + TypeScript
+pnpm test             # vitest — iCal parse/serialize roundtrip
+pnpm check            # svelte-check + TypeScript
 ```
 
 A `samples/sample-diary.ics` file is included for trying Import and search.

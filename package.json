@@ -26,6 +26,9 @@
     "ical.js": "^2.1.0",
     "markdown-it": "^14.1.0"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  },
   "devDependencies": {
     "@fontsource/inter": "^5.1.1",
     "@fontsource/jetbrains-mono": "^5.1.2",
