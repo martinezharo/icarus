@@ -161,26 +161,28 @@
           {muted ? 'opacity-35' : ''}"
         onclick={() => app.selectDay(dateKey(day))}
       >
-        <span
-          class="grid h-7 w-7 place-items-center rounded-full text-sm tabular-nums transition-colors
-            {isSameDay(day, today)
-              ? 'bg-text font-semibold text-ink'
-              : 'text-muted group-hover:text-text'}"
-        >
-          {day.getDate()}
-        </span>
-
-        <!-- Entry indicator: one muted dot, or a small cluster for multiples -->
-        {#if count > 0}
-          <span class="mt-auto flex items-center gap-1 pl-0.5 pt-1">
-            {#each Array(Math.min(count, 3)) as _, i (i)}
-              <span class="h-1.5 w-1.5 rounded-full bg-muted"></span>
-            {/each}
-            {#if count > 3}
-              <span class="text-[0.6rem] font-medium leading-none text-muted">+{count - 3}</span>
-            {/if}
+        <div class="flex items-center gap-1.5">
+          <span
+            class="grid h-7 w-7 shrink-0 place-items-center rounded-full text-sm tabular-nums transition-colors
+              {isSameDay(day, today)
+                ? 'bg-text font-semibold text-ink'
+                : 'text-muted group-hover:text-text'}"
+          >
+            {day.getDate()}
           </span>
-        {/if}
+
+          <!-- Entry indicator: one muted dot, or a small cluster for multiples -->
+          {#if count > 0}
+            <span class="flex items-center gap-1">
+              {#each Array(Math.min(count, 3)) as _, i (i)}
+                <span class="h-1.5 w-1.5 rounded-full bg-muted"></span>
+              {/each}
+              {#if count > 3}
+                <span class="text-[0.6rem] font-medium leading-none text-muted">+{count - 3}</span>
+              {/if}
+            </span>
+          {/if}
+        </div>
       </button>
     {/each}
   </div>
