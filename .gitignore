@@ -28,3 +28,7 @@ app-icon.png
 
 # The diary data file lives OUTSIDE this repo by design — never commit it.
 *.ics
+
+#agents
+.claude/
+.agents/
