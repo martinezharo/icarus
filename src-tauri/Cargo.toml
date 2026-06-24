@@ -1,0 +1,31 @@
+[package]
+name = "icarus-journal"
+version = "0.1.0"
+description = "Icarus Journal — a local-first, air-gapped journaling app."
+authors = ["Icarus"]
+edition = "2021"
+rust-version = "1.77.2"
+
+# The Tauri build pipeline compiles the app's Rust into both a shared library
+# (for mobile, unused here) and a binary, so we expose the lib explicitly.
+[lib]
+name = "icarus_journal_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-store = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

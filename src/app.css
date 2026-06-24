@@ -1,0 +1,221 @@
+@import 'tailwindcss';
+
+/* Bundled, offline-friendly fonts (no CDN — air-gapped safe). */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+
+/* ------------------------------------------------------------------ */
+/* Design tokens — the monochromatic "luxury dark" identity.          */
+/* ------------------------------------------------------------------ */
+@theme {
+  --color-ink: #09090b; /* deepest background          */
+  --color-surface: #101012; /* raised surfaces           */
+  --color-slate: #27272a; /* borders / hover fills     */
+  --color-slate-soft: #18181b; /* subtle panels         */
+  --color-muted: #71717a; /* secondary text / accents  */
+  --color-faint: #3f3f46; /* low-contrast lines        */
+  --color-text: #fafafa; /* primary text              */
+
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  --radius-xl: 1rem;
+
+  /* Bespoke easing for the "satisfying" micro-interactions. */
+  --ease-glide: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ------------------------------------------------------------------ */
+/* Base layer                                                          */
+/* ------------------------------------------------------------------ */
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-ink);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    font-feature-settings: 'cv11', 'ss01';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden; /* the app owns its own scroll regions */
+    user-select: none; /* desktop-app feel; opt back in for editors/readers */
+  }
+
+  #app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Inputs / editable regions re-enable selection. */
+  input,
+  textarea,
+  [contenteditable],
+  .selectable,
+  .markdown {
+    user-select: text;
+  }
+
+  /* Slim, ghosted scrollbars. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-slate) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-slate);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-muted) 35%, transparent);
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--color-muted);
+    outline-offset: 2px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Markdown reader typography — clean, editorial, monochrome.         */
+/* ------------------------------------------------------------------ */
+@layer components {
+  .markdown {
+    color: var(--color-text);
+    line-height: 1.7;
+    font-size: 0.975rem;
+  }
+  .markdown > :first-child {
+    margin-top: 0;
+  }
+  .markdown > :last-child {
+    margin-bottom: 0;
+  }
+  .markdown h1,
+  .markdown h2,
+  .markdown h3,
+  .markdown h4 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+    margin: 1.6em 0 0.6em;
+  }
+  .markdown h1 {
+    font-size: 1.6rem;
+  }
+  .markdown h2 {
+    font-size: 1.3rem;
+  }
+  .markdown h3 {
+    font-size: 1.1rem;
+  }
+  .markdown p {
+    margin: 0.85em 0;
+  }
+  .markdown a {
+    color: var(--color-text);
+    text-decoration: underline;
+    text-decoration-color: var(--color-muted);
+    text-underline-offset: 3px;
+  }
+  .markdown strong {
+    font-weight: 600;
+  }
+  .markdown em {
+    color: color-mix(in oklab, var(--color-text) 90%, transparent);
+  }
+  .markdown blockquote {
+    margin: 1.1em 0;
+    padding-left: 1.1em;
+    border-left: 2px solid var(--color-faint);
+    color: var(--color-muted);
+    font-style: italic;
+  }
+  .markdown ul,
+  .markdown ol {
+    margin: 0.85em 0;
+    padding-left: 1.4em;
+  }
+  .markdown li {
+    margin: 0.3em 0;
+  }
+  .markdown li::marker {
+    color: var(--color-muted);
+  }
+  .markdown code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: var(--color-slate-soft);
+    border: 1px solid var(--color-slate);
+    border-radius: 0.35rem;
+    padding: 0.1em 0.35em;
+  }
+  .markdown pre {
+    background: var(--color-slate-soft);
+    border: 1px solid var(--color-slate);
+    border-radius: 0.6rem;
+    padding: 1em 1.1em;
+    overflow-x: auto;
+    margin: 1.1em 0;
+  }
+  .markdown pre code {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.85rem;
+  }
+  .markdown hr {
+    border: none;
+    border-top: 1px solid var(--color-slate);
+    margin: 1.8em 0;
+  }
+  .markdown table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.1em 0;
+    font-size: 0.9rem;
+  }
+  .markdown th,
+  .markdown td {
+    border: 1px solid var(--color-slate);
+    padding: 0.5em 0.7em;
+    text-align: left;
+  }
+  .markdown th {
+    color: var(--color-muted);
+    font-weight: 500;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Utilities                                                           */
+/* ------------------------------------------------------------------ */
+@utility no-drag {
+  -webkit-user-drag: none;
+}
+
+/* A faint grain/vignette helper for the cinematic welcome screen. */
+.vignette {
+  background:
+    radial-gradient(
+      120% 120% at 50% 0%,
+      color-mix(in oklab, var(--color-slate) 22%, transparent) 0%,
+      transparent 55%
+    ),
+    var(--color-ink);
+}

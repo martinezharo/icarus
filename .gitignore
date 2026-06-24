@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Generated app icons (regenerate with `npm run icon`)
+app-icon.png
+
+# Editor / OS
+.DS_Store
+*.local
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Environment variables
+.env
+.env.*.local
+
+# Vite cache
+.vite/
+
+# Logs
+*.log
+
+# The journal data file lives OUTSIDE this repo by design — never commit it.
+*.ics
