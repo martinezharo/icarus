@@ -5,8 +5,9 @@
  * import / export) — each of which keeps the in-memory model and the on-disk
  * `.ics` file in sync via an atomic write.
  */
-import type { EntryDraft, DiaryEntry, Toast, ToastLevel } from './types';
+import type { DiaryEntry, StoredDraft, Toast, ToastLevel } from './types';
 import { generateUid, parseIcs, serializeIcs } from './ical';
+import { loadDrafts, persistDrafts } from './drafts';
 import {
   readIcs,
   writeIcsAtomic,
@@ -54,6 +55,26 @@ class AppStore {
   busy = $state(false);
   toasts = $state<Toast[]>([]);
 
+  // --- draft editor state -------------------------------------------------
+  // The live contents of the writing dock. Kept here (not in the component) so
+  // it can be autosaved and swapped between drafts from one place.
+  draftId = $state<string | null>(null); // null = a fresh, unsaved draft
+  // True only when the editor was loaded from a previously saved draft (not a
+  // brand-new entry that merely got autosaved). Gates the "Discard" action.
+  draftOpened = $state(false);
+  draftTitle = $state('');
+  draftLocation = $state('');
+  draftContent = $state('');
+  draftDateKey = $state(dateKey(new Date()));
+
+  /** All persisted drafts, newest first. */
+  drafts = $state<StoredDraft[]>([]);
+  /** Id of the draft awaiting delete confirmation (null = dialog closed). */
+  confirmDeleteId = $state<string | null>(null);
+
+  // Debounce handle for autosave (plain field — not reactive).
+  private draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+
   // --- derived ------------------------------------------------------------
   entriesByDay = $derived.by(() => groupByDay(this.entries));
 
@@ -64,6 +85,7 @@ class AppStore {
   // --- boot ---------------------------------------------------------------
   /** Decide the initial screen: reopen the saved vault, or show Welcome. */
   async init(): Promise<void> {
+    void this.loadDraftsFromDisk();
     try {
       const saved = await getSavedIcsPath();
       if (saved && (await exists(saved))) {
@@ -132,18 +154,26 @@ class AppStore {
 
   // --- writing ------------------------------------------------------------
   /**
-   * Commit a draft as a new entry: update memory, rebuild search, and persist.
-   * In blank-canvas mode (no file yet) we prompt for a save location on the
-   * first commit so the work is never silently lost.
+   * Commit the current editor contents as a new entry: update memory, rebuild
+   * search, and persist. In blank-canvas mode (no file yet) we prompt for a
+   * save location on the first commit so the work is never silently lost.
+   * On success the backing draft is removed and the editor is cleared.
    */
-  async commit(draft: EntryDraft): Promise<void> {
+  async commit(): Promise<void> {
+    const title = this.draftTitle.trim();
+    if (!title && !this.draftContent.trim()) {
+      this.toast('info', 'Write something first.');
+      return;
+    }
+
     const entry: DiaryEntry = {
       uid: generateUid(),
-      title: draft.title.trim() || 'Untitled',
-      content: draft.content,
-      location: draft.location.trim() || undefined,
-      date: keyToDate(draft.dateKey),
+      title: title || 'Untitled',
+      content: this.draftContent,
+      location: this.draftLocation.trim() || undefined,
+      date: keyToDate(this.draftDateKey),
     };
+    const targetKey = this.draftDateKey;
 
     this.entries = [...this.entries, entry];
     buildSearchIndex(this.entries);
@@ -160,9 +190,150 @@ class AppStore {
       await this.persist();
     }
 
-    this.selectedKey = draft.dateKey;
+    // A committed entry must no longer linger as a draft.
+    this.cancelDraftSave();
+    if (this.draftId) await this.removeDraft(this.draftId);
+    this.resetEditor();
+
+    this.selectedKey = targetKey;
     this.currentMonth = startOfMonth(entry.date);
     this.dockExpanded = false;
+  }
+
+  // --- drafts -------------------------------------------------------------
+  /** Pull persisted drafts into memory on boot (no-op outside Tauri). */
+  async loadDraftsFromDisk(): Promise<void> {
+    try {
+      this.drafts = await loadDrafts();
+    } catch {
+      // Store plugin unavailable (e.g. plain `vite dev`) — drafts stay empty.
+    }
+  }
+
+  private hasEditorContent(): boolean {
+    return !!(
+      this.draftTitle.trim() ||
+      this.draftContent.trim() ||
+      this.draftLocation.trim()
+    );
+  }
+
+  /** Clear the editor back to a fresh, unsaved draft. */
+  resetEditor(): void {
+    this.draftId = null;
+    this.draftOpened = false;
+    this.draftTitle = '';
+    this.draftLocation = '';
+    this.draftContent = '';
+    this.draftDateKey = dateKey(new Date());
+  }
+
+  private cancelDraftSave(): void {
+    if (this.draftSaveTimer) {
+      clearTimeout(this.draftSaveTimer);
+      this.draftSaveTimer = null;
+    }
+  }
+
+  /** Debounced autosave — called as the user types. */
+  scheduleDraftSave(): void {
+    this.cancelDraftSave();
+    this.draftSaveTimer = setTimeout(() => {
+      this.draftSaveTimer = null;
+      void this.flushDraft();
+    }, 600);
+  }
+
+  /**
+   * Write the current editor contents into the persisted draft list right now.
+   * Creates a draft id on first save so subsequent edits update the same one.
+   * Empty editors are ignored so we never persist a blank draft.
+   */
+  async flushDraft(): Promise<void> {
+    if (!this.hasEditorContent()) return;
+    if (!this.draftId) this.draftId = crypto.randomUUID();
+
+    const draft: StoredDraft = {
+      id: this.draftId,
+      title: this.draftTitle,
+      location: this.draftLocation,
+      content: this.draftContent,
+      dateKey: this.draftDateKey,
+      updatedAt: Date.now(),
+    };
+
+    const rest = this.drafts.filter((d) => d.id !== draft.id);
+    this.drafts = [draft, ...rest];
+    try {
+      await persistDrafts(this.drafts);
+    } catch {
+      // Persistence unavailable — keep it in memory at least.
+    }
+  }
+
+  /** Flush immediately (used on collapse / app close). */
+  async flushDraftNow(): Promise<void> {
+    this.cancelDraftSave();
+    await this.flushDraft();
+  }
+
+  private async removeDraft(id: string): Promise<void> {
+    this.drafts = this.drafts.filter((d) => d.id !== id);
+    try {
+      await persistDrafts(this.drafts);
+    } catch {
+      // ignore — list already updated in memory
+    }
+  }
+
+  /** Load a saved draft into the editor, stashing whatever was being written. */
+  async openDraft(id: string): Promise<void> {
+    // Don't lose the in-progress work: persist it before swapping.
+    await this.flushDraftNow();
+    const d = this.drafts.find((x) => x.id === id);
+    if (!d) return;
+    this.draftId = d.id;
+    this.draftOpened = true;
+    this.draftTitle = d.title;
+    this.draftLocation = d.location;
+    this.draftContent = d.content;
+    this.draftDateKey = d.dateKey;
+    this.dockExpanded = true;
+  }
+
+  /** "Save as draft" — stash the current work and start a fresh editor. */
+  async saveDraftAndReset(): Promise<void> {
+    this.cancelDraftSave();
+    if (!this.hasEditorContent()) {
+      this.toast('info', 'Write something first.');
+      return;
+    }
+    await this.flushDraft();
+    this.resetEditor();
+    this.toast('success', 'Saved to drafts');
+  }
+
+  /** Open the shared confirmation dialog for deleting/discarding a draft. */
+  requestDeleteDraft(id: string): void {
+    this.confirmDeleteId = id;
+  }
+  cancelDeleteDraft(): void {
+    this.confirmDeleteId = null;
+  }
+  /** Carry out the pending deletion (both "Delete" and "Discard" land here). */
+  async confirmDeleteDraft(): Promise<void> {
+    const id = this.confirmDeleteId;
+    this.confirmDeleteId = null;
+    if (!id) return;
+    await this.deleteDraft(id);
+    this.toast('info', 'Draft deleted');
+  }
+
+  /** Delete a draft; clears the editor (and pending autosave) if it was open. */
+  async deleteDraft(id: string): Promise<void> {
+    if (this.draftId === id) this.cancelDraftSave();
+    await this.removeDraft(id);
+    if (this.draftId === id) this.resetEditor();
   }
 
   /** Write current entries to `filePath` atomically. Toasts on failure. */

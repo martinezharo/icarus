@@ -8,6 +8,7 @@
   import DayPane from './components/DayPane.svelte';
   import WritingDock from './components/WritingDock.svelte';
   import SettingsMenu from './components/SettingsMenu.svelte';
+  import DraftDeleteDialog from './components/DraftDeleteDialog.svelte';
   import Toasts from './components/Toasts.svelte';
 
   onMount(() => {
@@ -20,7 +21,23 @@
       else if (app.selectedKey) app.closeDay();
     };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+
+    // Last-chance draft flush when the window is hidden or about to close, so
+    // an in-progress entry is never lost to a quit or a power cut.
+    const flush = () => void app.flushDraftNow();
+    const onVisibility = () => {
+      if (document.hidden) flush();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+    };
   });
 </script>
 
@@ -42,4 +59,5 @@
   <SettingsMenu />
 {/if}
 
+<DraftDeleteDialog />
 <Toasts />

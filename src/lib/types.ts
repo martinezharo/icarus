@@ -12,13 +12,19 @@ export interface DiaryEntry {
   date: Date;
 }
 
-/** Draft shape used by the writing dock before an entry is committed. */
-export interface EntryDraft {
+/**
+ * A draft persisted to disk so half-written entries survive a crash, power
+ * loss, or simply closing the app. Many can coexist; `id` is the stable key.
+ */
+export interface StoredDraft {
+  id: string;
   title: string;
   location: string;
   content: string;
-  /** ISO `YYYY-MM-DD` from the native date input. */
+  /** ISO `YYYY-MM-DD`. */
   dateKey: string;
+  /** Epoch ms of the last edit — used to sort the drafts list. */
+  updatedAt: number;
 }
 
 /** A typed result so callers can react to parse failures without throwing. */

@@ -2,37 +2,49 @@
   import { slide } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { app } from '../lib/store.svelte';
-  import { dateKey } from '../lib/date';
   import { autogrow, verticalDrag } from '../lib/actions';
+  import DraftsMenu from './DraftsMenu.svelte';
 
-  let title = $state('');
-  let location = $state('');
-  let content = $state('');
-  let dateVal = $state(dateKey(new Date()));
   let saving = $state(false);
+
+  function askDiscard() {
+    if (app.draftId) app.requestDeleteDraft(app.draftId);
+  }
+
+  // Is there anything worth saving / discarding right now?
+  const hasContent = $derived(
+    !!(
+      app.draftTitle.trim() ||
+      app.draftContent.trim() ||
+      app.draftLocation.trim()
+    ),
+  );
+
+  // Autosave: whenever the editor fields change, schedule a debounced write to
+  // the persisted draft store. This is what makes an unsaved entry survive a
+  // crash, a power cut, or quitting the app mid-sentence.
+  $effect(() => {
+    // Track every field so the effect re-runs on any edit.
+    void app.draftTitle;
+    void app.draftLocation;
+    void app.draftContent;
+    void app.draftDateKey;
+    app.scheduleDraftSave();
+  });
 
   function expand() {
     app.dockExpanded = true;
   }
   function collapse() {
+    // Flush before hiding so nothing is lost if the app closes while collapsed.
+    void app.flushDraftNow();
     app.dockExpanded = false;
-  }
-  function reset() {
-    title = '';
-    location = '';
-    content = '';
-    dateVal = dateKey(new Date());
   }
 
   async function commit() {
-    if (!title.trim() && !content.trim()) {
-      app.toast('info', 'Write something first.');
-      return;
-    }
     saving = true;
-    await app.commit({ title, location, content, dateKey: dateVal });
+    await app.commit();
     saving = false;
-    reset();
   }
 
   function onKeydown(e: KeyboardEvent) {
@@ -72,7 +84,7 @@
           <input
             class="w-full bg-transparent text-2xl font-semibold tracking-tight text-text placeholder:text-faint focus:outline-none"
             placeholder="Title"
-            bind:value={title}
+            bind:value={app.draftTitle}
           />
 
           <!-- Location / subtitle + date -->
@@ -80,12 +92,12 @@
             <input
               class="min-w-0 flex-1 bg-transparent text-sm text-muted placeholder:text-faint focus:outline-none"
               placeholder="Add a location or subtitle"
-              bind:value={location}
+              bind:value={app.draftLocation}
             />
             <input
               type="date"
               class="rounded-md bg-slate-soft px-2.5 py-1 text-xs text-muted [color-scheme:dark] focus:outline-none focus:ring-1 focus:ring-faint"
-              bind:value={dateVal}
+              bind:value={app.draftDateKey}
             />
           </div>
 
@@ -93,39 +105,66 @@
           <textarea
             class="mt-4 max-h-[44vh] min-h-[7rem] w-full resize-none overflow-y-auto bg-transparent font-sans text-[0.95rem] leading-relaxed text-text placeholder:text-faint focus:outline-none"
             placeholder="Write today's chapter… Markdown is welcome."
-            bind:value={content}
+            bind:value={app.draftContent}
             use:autogrow
           ></textarea>
 
           <!-- Actions -->
-          <div class="mt-4 flex items-center justify-between">
-            <span class="text-xs text-faint">
-              <kbd class="font-mono">⌘/Ctrl</kbd> + <kbd class="font-mono">↵</kbd> to commit
-            </span>
-            <button
-              class="rounded-lg bg-text px-4 py-2 text-sm font-medium text-ink transition-opacity hover:opacity-90 disabled:opacity-50"
-              onclick={commit}
-              disabled={saving}
-            >
-              {saving ? 'Saving…' : 'Commit entry'}
-            </button>
+          <div class="mt-4 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <DraftsMenu align="left" />
+              {#if app.draftOpened}
+                <button
+                  class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-red-400/10 hover:text-red-400"
+                  onclick={askDiscard}
+                >
+                  Discard
+                </button>
+              {/if}
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="hidden text-xs text-faint sm:inline">
+                <kbd class="font-mono">⌘/Ctrl</kbd> + <kbd class="font-mono">↵</kbd>
+              </span>
+              <button
+                class="rounded-lg border border-slate px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-slate hover:text-text disabled:opacity-50"
+                onclick={() => app.saveDraftAndReset()}
+                disabled={saving}
+              >
+                Save as draft
+              </button>
+              <button
+                class="rounded-lg bg-text px-4 py-2 text-sm font-medium text-ink transition-opacity hover:opacity-90 disabled:opacity-50"
+                onclick={commit}
+                disabled={saving}
+              >
+                {saving ? 'Saving…' : 'Commit entry'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     {:else}
-      <!-- Collapsed strip: click or drag up to expand -->
-      <button
-        class="group flex w-full items-center gap-3 border-t border-slate bg-surface/90 px-6 py-3.5 text-left backdrop-blur-xl transition-colors hover:bg-slate-soft"
-        onclick={expand}
-        use:verticalDrag={{ onResolve: (d) => d === 'up' && expand() }}
+      <!-- Collapsed strip: expand to write, plus quick access to drafts -->
+      <div
+        class="mx-auto flex w-full items-center gap-2 border-t border-slate bg-surface/90 px-6 py-3 backdrop-blur-xl"
       >
-        <span class="grid h-6 w-6 place-items-center rounded-md text-muted transition-colors group-hover:text-text">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-        </span>
-        <span class="text-sm text-muted transition-colors group-hover:text-text">
-          Write today's chapter…
-        </span>
-      </button>
+        <button
+          class="group flex flex-1 items-center gap-3 text-left"
+          onclick={expand}
+          use:verticalDrag={{ onResolve: (d) => d === 'up' && expand() }}
+        >
+          <span class="grid h-6 w-6 place-items-center rounded-md text-muted transition-colors group-hover:text-text">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </span>
+          <span class="text-sm text-muted transition-colors group-hover:text-text">
+            {app.draftId || hasContent ? 'Continue your draft…' : "Write today's chapter…"}
+          </span>
+        </button>
+
+        <DraftsMenu align="right" />
+      </div>
     {/if}
   </div>
 </div>
