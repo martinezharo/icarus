@@ -10,7 +10,7 @@ const md = new MarkdownIt({
   html: false, // ignore raw HTML in source — sanitizer is belt-and-braces
   linkify: true,
   typographer: true,
-  breaks: true, // single newlines become <br>, matching a journaling feel
+  breaks: true, // single newlines become <br>, matching a diarying feel
 });
 
 // Open links in the same webview but never let them navigate away from the app

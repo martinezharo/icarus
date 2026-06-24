@@ -1,24 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import { parseIcs, serializeIcs } from '../src/lib/ical';
-import type { JournalEntry } from '../src/lib/types';
+import type { DiaryEntry } from '../src/lib/types';
 import { dateKey } from '../src/lib/date';
 
-const sample: JournalEntry[] = [
+const sample: DiaryEntry[] = [
   {
-    uid: 'a@icarus.journal',
+    uid: 'a@icarus.diary',
     title: 'Morning pages',
     content: '# Heading\n\nSome *italic* and `code`.\n\n- one\n- two',
     location: 'Kitchen table',
     date: new Date(2026, 5, 8), // 8 June 2026
   },
   {
-    uid: 'b@icarus.journal',
+    uid: 'b@icarus.diary',
     title: 'Evening reflection',
     content: 'A second entry on the **same** day.',
     date: new Date(2026, 5, 8), // same day — the edge case
   },
   {
-    uid: 'c@icarus.journal',
+    uid: 'c@icarus.diary',
     title: 'Next day',
     content: 'Plain text.',
     location: 'Park',

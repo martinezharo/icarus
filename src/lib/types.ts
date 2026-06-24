@@ -1,5 +1,5 @@
-/** A single journal entry, mapped 1:1 to a VEVENT in the .ics file. */
-export interface JournalEntry {
+/** A single diary entry, mapped 1:1 to a VEVENT in the .ics file. */
+export interface DiaryEntry {
   /** VEVENT UID — stable identity, used for de-dupe and updates. */
   uid: string;
   /** SUMMARY — the entry title. */
@@ -23,7 +23,7 @@ export interface EntryDraft {
 
 /** A typed result so callers can react to parse failures without throwing. */
 export type ParseResult =
-  | { ok: true; entries: JournalEntry[] }
+  | { ok: true; entries: DiaryEntry[] }
   | { ok: false; error: string };
 
 /** Severity levels for user-facing toasts. */

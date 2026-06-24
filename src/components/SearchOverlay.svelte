@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
   import type { SearchHit } from '../lib/search';
-  import type { JournalEntry } from '../lib/types';
+  import type { DiaryEntry } from '../lib/types';
   import { excerpt } from '../lib/markdown';
   import { longDayLabel } from '../lib/date';
 
@@ -12,7 +12,7 @@
   }: {
     hits: SearchHit[];
     activeIndex: number;
-    onselect: (entry: JournalEntry) => void;
+    onselect: (entry: DiaryEntry) => void;
   } = $props();
 </script>
 

@@ -5,7 +5,7 @@
  * import / export) — each of which keeps the in-memory model and the on-disk
  * `.ics` file in sync via an atomic write.
  */
-import type { EntryDraft, JournalEntry, Toast, ToastLevel } from './types';
+import type { EntryDraft, DiaryEntry, Toast, ToastLevel } from './types';
 import { generateUid, parseIcs, serializeIcs } from './ical';
 import {
   readIcs,
@@ -24,8 +24,8 @@ import { addMonths, dateKey, keyToDate, startOfMonth } from './date';
 
 type View = 'welcome' | 'main';
 
-function groupByDay(entries: JournalEntry[]): Map<string, JournalEntry[]> {
-  const map = new Map<string, JournalEntry[]>();
+function groupByDay(entries: DiaryEntry[]): Map<string, DiaryEntry[]> {
+  const map = new Map<string, DiaryEntry[]>();
   for (const e of entries) {
     const key = dateKey(e.date);
     const bucket = map.get(key);
@@ -39,7 +39,7 @@ let toastSeq = 0;
 
 class AppStore {
   // --- core reactive state ------------------------------------------------
-  entries = $state<JournalEntry[]>([]);
+  entries = $state<DiaryEntry[]>([]);
   filePath = $state<string | null>(null);
   view = $state<View>('welcome');
   ready = $state(false); // finished the initial boot check
@@ -57,7 +57,7 @@ class AppStore {
   // --- derived ------------------------------------------------------------
   entriesByDay = $derived.by(() => groupByDay(this.entries));
 
-  selectedEntries = $derived.by<JournalEntry[]>(() =>
+  selectedEntries = $derived.by<DiaryEntry[]>(() =>
     this.selectedKey ? (this.entriesByDay.get(this.selectedKey) ?? []) : [],
   );
 
@@ -137,7 +137,7 @@ class AppStore {
    * first commit so the work is never silently lost.
    */
   async commit(draft: EntryDraft): Promise<void> {
-    const entry: JournalEntry = {
+    const entry: DiaryEntry = {
       uid: generateUid(),
       title: draft.title.trim() || 'Untitled',
       content: draft.content,
@@ -212,7 +212,7 @@ class AppStore {
 
   /** Export a clean backup copy to any location (USB drive, etc.). */
   async exportVault(): Promise<void> {
-    const path = await pickIcsToSave('icarus-journal-backup.ics');
+    const path = await pickIcsToSave('icarus-diary-backup.ics');
     if (!path) return;
     this.busy = true;
     try {
@@ -246,7 +246,7 @@ class AppStore {
   }
 
   /** Jump from a search hit straight to its day. */
-  jumpToEntry(entry: JournalEntry): void {
+  jumpToEntry(entry: DiaryEntry): void {
     this.currentMonth = startOfMonth(entry.date);
     this.selectedKey = dateKey(entry.date);
     this.searchOpen = false;

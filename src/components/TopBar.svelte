@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { app } from '../lib/store.svelte';
   import { search, type SearchHit } from '../lib/search';
-  import type { JournalEntry } from '../lib/types';
+  import type { DiaryEntry } from '../lib/types';
   import SearchOverlay from './SearchOverlay.svelte';
 
   let query = $state('');
@@ -19,7 +19,7 @@
     if (activeIndex >= hits.length) activeIndex = 0;
   });
 
-  function choose(entry: JournalEntry) {
+  function choose(entry: DiaryEntry) {
     app.jumpToEntry(entry);
     query = '';
     inputEl?.blur();

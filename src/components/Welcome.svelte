@@ -43,10 +43,10 @@
       <div class="mx-auto mb-8 grid h-14 w-14 place-items-center rounded-full border border-faint">
         <span class="h-2.5 w-2.5 rounded-full bg-muted"></span>
       </div>
-      <h1 class="text-3xl font-semibold tracking-tight text-text">Icarus Journal</h1>
+      <h1 class="text-3xl font-semibold tracking-tight text-text">Icarus Diary</h1>
       <p class="mt-3 text-sm leading-relaxed text-muted">
         A quiet, local-first place for your days.<br />
-        Begin by opening an existing journal, or start with a blank canvas.
+        Begin by opening an existing diary, or start with a blank canvas.
       </p>
     </div>
 

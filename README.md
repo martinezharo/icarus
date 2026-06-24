@@ -1,6 +1,6 @@
-# Icarus Journal
+# Icarus Diary
 
-A native, **local-first, air-gapped** journaling app. Your entries are stored as
+A native, **local-first, air-gapped** diarying app. Your entries are stored as
 standard `VEVENT` components in a plain `.ics` file that lives wherever you want —
 outside this repo, on a USB stick, anywhere. No server, no account, no network.
 
@@ -46,7 +46,7 @@ npm test              # vitest — iCal parse/serialize roundtrip
 npm run check         # svelte-check + TypeScript
 ```
 
-A `samples/sample-journal.ics` file is included for trying Import and search.
+A `samples/sample-diary.ics` file is included for trying Import and search.
 
 ---
 
@@ -58,7 +58,7 @@ A `samples/sample-journal.ics` file is included for trying Import and search.
 - **Parsing** — `ical.js`, wrapped defensively in `src/lib/ical.ts`; a corrupt
   file shows a calm message and never loses in-memory data.
 - **Saving** — atomic: write `file.ics.tmp`, then rename over the original, so a
-  crash mid-write can't corrupt your journal (`src/lib/fs.ts`).
+  crash mid-write can't corrupt your diary (`src/lib/fs.ts`).
 - **Search** — local fuzzy full-text via Fuse.js, focused with `Ctrl/Cmd + K`.
 - **State** — Svelte 5 runes in `src/lib/store.svelte.ts`.
 

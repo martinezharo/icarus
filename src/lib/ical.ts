@@ -1,15 +1,15 @@
 /**
  * The iCalendar layer. All `.ics` reading/writing goes through here so the rest
- * of the app only ever deals with the clean {@link JournalEntry} model.
+ * of the app only ever deals with the clean {@link DiaryEntry} model.
  *
  * Uses `ical.js` (per spec). Parsing is fully defensive: a corrupt or partial
  * file yields a typed error rather than throwing, so the UI can stay alive and
  * keep whatever data is already in memory.
  */
 import ICAL from 'ical.js';
-import type { JournalEntry, ParseResult } from './types';
+import type { DiaryEntry, ParseResult } from './types';
 
-const PRODID = '-//Icarus Journal//Local-First Journal//EN';
+const PRODID = '-//Icarus Diary//Local-First Diary//EN';
 
 /** Generate a stable, iCal-style UID for a new entry. */
 export function generateUid(): string {
@@ -17,7 +17,7 @@ export function generateUid(): string {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
-  return `${id}@icarus.journal`;
+  return `${id}@icarus.diary`;
 }
 
 /** Coerce an ical.js property value to a trimmed string (or undefined). */
@@ -30,7 +30,7 @@ function str(value: unknown): string | undefined {
 /**
  * Read the calendar date off a DTSTART value. We pull the literal calendar
  * components (year/month/day) rather than `toJSDate()` to avoid any timezone
- * drift across midnight — the journal is day-granular by design.
+ * drift across midnight — the diary is day-granular by design.
  */
 function dtToDate(value: unknown): Date {
   const t = value as { year?: number; month?: number; day?: number } | null;
@@ -52,7 +52,7 @@ export function parseIcs(text: string): ParseResult {
     const root = new ICAL.Component(jcal);
     const vevents = root.getAllSubcomponents('vevent');
 
-    const entries: JournalEntry[] = vevents.map((ve) => {
+    const entries: DiaryEntry[] = vevents.map((ve) => {
       const dtstart = ve.getFirstPropertyValue('dtstart');
       return {
         uid: str(ve.getFirstPropertyValue('uid')) ?? generateUid(),
@@ -74,7 +74,7 @@ export function parseIcs(text: string): ParseResult {
  * Serialize entries to valid `.ics` text. DTSTART is written as a date-only
  * value (VALUE=DATE) since entries belong to a day, not a moment.
  */
-export function serializeIcs(entries: JournalEntry[]): string {
+export function serializeIcs(entries: DiaryEntry[]): string {
   const vcal = new ICAL.Component(['vcalendar', [], []]);
   vcal.updatePropertyWithValue('version', '2.0');
   vcal.updatePropertyWithValue('prodid', PRODID);

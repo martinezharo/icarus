@@ -26,5 +26,5 @@ app-icon.png
 # Logs
 *.log
 
-# The journal data file lives OUTSIDE this repo by design — never commit it.
+# The diary data file lives OUTSIDE this repo by design — never commit it.
 *.ics

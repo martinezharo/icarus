@@ -4,16 +4,16 @@
  * no network, fully air-gapped.
  */
 import Fuse from 'fuse.js';
-import type { JournalEntry } from './types';
+import type { DiaryEntry } from './types';
 
 export interface SearchHit {
-  entry: JournalEntry;
+  entry: DiaryEntry;
   score: number;
 }
 
-let fuse: Fuse<JournalEntry> | null = null;
+let fuse: Fuse<DiaryEntry> | null = null;
 
-const OPTIONS: import('fuse.js').IFuseOptions<JournalEntry> = {
+const OPTIONS: import('fuse.js').IFuseOptions<DiaryEntry> = {
   keys: [
     { name: 'title', weight: 0.5 },
     { name: 'location', weight: 0.2 },
@@ -26,7 +26,7 @@ const OPTIONS: import('fuse.js').IFuseOptions<JournalEntry> = {
 };
 
 /** (Re)build the search index from the current entries. */
-export function buildSearchIndex(entries: JournalEntry[]): void {
+export function buildSearchIndex(entries: DiaryEntry[]): void {
   fuse = new Fuse(entries, OPTIONS);
 }
 

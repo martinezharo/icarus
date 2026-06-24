@@ -1334,7 +1334,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "icarus-journal"
+name = "icarus-diary"
 version = "0.1.0"
 dependencies = [
  "serde",

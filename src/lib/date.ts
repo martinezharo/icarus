@@ -1,5 +1,5 @@
 /**
- * Date helpers. Journal entries are day-granular, so we key everything by a
+ * Date helpers. Diary entries are day-granular, so we key everything by a
  * local `YYYY-MM-DD` string and deliberately avoid UTC conversions (which would
  * shift a date across midnight depending on the user's timezone).
  */

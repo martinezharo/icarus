@@ -4,7 +4,7 @@
  *
  * The data file lives OUTSIDE the app. Writes are atomic: we write a sibling
  * `.tmp` file, then rename it over the original. On a single filesystem the
- * rename is atomic, so a crash mid-write can never corrupt the real journal.
+ * rename is atomic, so a crash mid-write can never corrupt the real diary.
  */
 import {
   readTextFile,
@@ -23,7 +23,7 @@ export async function pickIcsToOpen(): Promise<string | null> {
     multiple: false,
     directory: false,
     filters: ICS_FILTERS,
-    title: 'Open journal (.ics)',
+    title: 'Open diary (.ics)',
   });
   // `open` returns string | string[] | null depending on options.
   return typeof selected === 'string' ? selected : null;
@@ -31,12 +31,12 @@ export async function pickIcsToOpen(): Promise<string | null> {
 
 /** Native "save as" dialog. Returns the chosen path, or null if cancelled. */
 export async function pickIcsToSave(
-  defaultName = 'icarus-journal.ics',
+  defaultName = 'icarus-diary.ics',
 ): Promise<string | null> {
   const path = await save({
     defaultPath: defaultName,
     filters: ICS_FILTERS,
-    title: 'Export journal',
+    title: 'Export diary',
   });
   return path ?? null;
 }
