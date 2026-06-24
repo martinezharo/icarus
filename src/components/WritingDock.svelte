@@ -124,9 +124,6 @@
             </div>
 
             <div class="flex items-center gap-2">
-              <span class="hidden text-xs text-faint sm:inline">
-                <kbd class="font-mono">⌘/Ctrl</kbd> + <kbd class="font-mono">↵</kbd>
-              </span>
               <button
                 class="rounded-lg border border-slate px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-slate hover:text-text disabled:opacity-50"
                 onclick={() => app.saveDraftAndReset()}
@@ -135,11 +132,15 @@
                 Save as draft
               </button>
               <button
-                class="rounded-lg bg-text px-4 py-2 text-sm font-medium text-ink transition-opacity hover:opacity-90 disabled:opacity-50"
+                class="flex items-center gap-2 rounded-lg bg-text px-4 py-2 text-sm font-medium text-ink transition-opacity hover:opacity-90 disabled:opacity-50"
                 onclick={commit}
                 disabled={saving}
               >
-                {saving ? 'Saving…' : 'Commit entry'}
+                <span>{saving ? 'Saving…' : 'Commit entry'}</span>
+                <span class="hidden items-center gap-1 text-ink/60 sm:flex">
+                  <kbd class="font-mono text-xs">⌘/Ctrl</kbd>
+                  <kbd class="font-mono text-xs">↵</kbd>
+                </span>
               </button>
             </div>
           </div>
