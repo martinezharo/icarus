@@ -4,6 +4,7 @@
   import { app } from '../lib/store.svelte';
   import { autogrow, verticalDrag } from '../lib/actions';
   import DraftsMenu from './DraftsMenu.svelte';
+  import DatePicker from './DatePicker.svelte';
 
   let saving = $state(false);
 
@@ -94,11 +95,7 @@
               placeholder="Add a location or subtitle"
               bind:value={app.draftLocation}
             />
-            <input
-              type="date"
-              class="rounded-md bg-slate-soft px-2.5 py-1 text-xs text-muted [color-scheme:dark] focus:outline-none focus:ring-1 focus:ring-faint"
-              bind:value={app.draftDateKey}
-            />
+            <DatePicker bind:value={app.draftDateKey} />
           </div>
 
           <!-- Body -->
