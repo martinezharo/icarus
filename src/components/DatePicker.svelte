@@ -67,9 +67,9 @@
   </button>
 
   {#if open}
-    <!-- The dock sits at the bottom of the screen, so open upward. -->
+    <!-- Trigger sits near the top of the fullscreen panel, so open downward. -->
     <div
-      class="absolute bottom-full right-0 z-50 mb-2 w-72 origin-bottom-right rounded-2xl border border-slate bg-surface p-3 shadow-2xl shadow-black/50"
+      class="absolute top-full right-0 z-50 mt-2 w-72 origin-top-right rounded-2xl border border-slate bg-surface p-3 shadow-2xl shadow-black/50"
       transition:scale={{ duration: 160, start: 0.95, easing: cubicOut }}
       use:clickOutside={() => (open = false)}
       role="dialog"
