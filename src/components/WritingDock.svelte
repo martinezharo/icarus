@@ -64,7 +64,7 @@
       <!-- Keydown is delegated from the inputs within (Cmd+Enter / Escape). -->
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
-        class="mx-auto w-full border-t border-slate bg-surface/95 shadow-2xl shadow-black/50 backdrop-blur-xl"
+        class="mx-auto w-full border-t border-slate bg-surface shadow-2xl shadow-black/50"
         transition:slide={{ duration: 320, easing: cubicOut }}
         onkeydown={onKeydown}
         role="form"
@@ -146,7 +146,7 @@
     {:else}
       <!-- Collapsed strip: expand to write, plus quick access to drafts -->
       <div
-        class="mx-auto flex w-full items-center gap-2 border-t border-slate bg-surface/90 px-6 py-3 backdrop-blur-xl"
+        class="mx-auto flex w-full items-center gap-2 border-t border-slate bg-surface px-6 py-3"
       >
         <button
           class="group flex flex-1 items-center gap-3 text-left"
