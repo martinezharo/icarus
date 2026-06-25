@@ -21,13 +21,21 @@
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-fs": "^2",
     "@tauri-apps/plugin-store": "^2",
+    "@tiptap/core": "^2.27.2",
+    "@tiptap/extension-list-keymap": "^2.27.2",
+    "@tiptap/extension-placeholder": "^2.27.2",
+    "@tiptap/pm": "^2.27.2",
+    "@tiptap/starter-kit": "^2.27.2",
     "dompurify": "^3.2.4",
     "fuse.js": "^7.1.0",
     "ical.js": "^2.1.0",
-    "markdown-it": "^14.1.0"
+    "markdown-it": "^14.1.0",
+    "tiptap-markdown": "^0.8.10"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "devDependencies": {
     "@fontsource/inter": "^5.1.1",

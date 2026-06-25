@@ -146,10 +146,20 @@
     color: var(--color-muted);
     font-style: italic;
   }
+  /* Tailwind v4 preflight resets lists to `list-style: none`; restore markers. */
   .markdown ul,
   .markdown ol {
     margin: 0.85em 0;
     padding-left: 1.4em;
+  }
+  .markdown ul {
+    list-style: disc;
+  }
+  .markdown ol {
+    list-style: decimal;
+  }
+  .markdown ul ul {
+    list-style: circle;
   }
   .markdown li {
     margin: 0.3em 0;
@@ -199,6 +209,21 @@
   .markdown th {
     color: var(--color-muted);
     font-weight: 500;
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* WYSIWYG editor (TipTap/ProseMirror) — shares .markdown typography */
+  /* ---------------------------------------------------------------- */
+  .ProseMirror {
+    outline: none;
+  }
+  /* Placeholder text shown while the editor is empty. */
+  .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--color-faint);
+    float: left;
+    height: 0;
+    pointer-events: none;
   }
 }
 

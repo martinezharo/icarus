@@ -50,6 +50,7 @@ class AppStore {
   currentMonth = $state<Date>(startOfMonth(new Date()));
 
   searchOpen = $state(false);
+  /** The writing dock has two states: a collapsed bar, or fullscreen. */
   dockExpanded = $state(false);
   settingsOpen = $state(false);
   busy = $state(false);

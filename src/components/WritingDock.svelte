@@ -1,12 +1,22 @@
 <script lang="ts">
-  import { slide } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { app } from '../lib/store.svelte';
-  import { autogrow, verticalDrag } from '../lib/actions';
+  import { verticalDrag } from '../lib/actions';
   import DraftsMenu from './DraftsMenu.svelte';
   import DatePicker from './DatePicker.svelte';
+  import RichEditor from './RichEditor.svelte';
 
   let saving = $state(false);
+
+  // Slide the fullscreen panel up from the bottom edge (translateY), rather
+  // than svelte's `slide`, which animates height and grows from the top.
+  function slideUp(_node: Element, { duration = 320 } = {}) {
+    return {
+      duration,
+      easing: cubicOut,
+      css: (t: number) => `transform: translateY(${(1 - t) * 100}%)`,
+    };
+  }
 
   function askDiscard() {
     if (app.draftId) app.requestDeleteDraft(app.draftId);
@@ -58,21 +68,26 @@
   }
 </script>
 
-<div class="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center">
+<div
+  class={[
+    'pointer-events-none fixed inset-x-0 bottom-0 flex justify-center',
+    app.dockExpanded ? 'z-50' : 'z-30',
+  ]}
+>
   <div class="pointer-events-auto w-full">
     {#if app.dockExpanded}
       <!-- Keydown is delegated from the inputs within (Cmd+Enter / Escape). -->
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
-        class="mx-auto w-full border-t border-slate bg-surface shadow-2xl shadow-black/50"
-        transition:slide={{ duration: 320, easing: cubicOut }}
+        class="fixed inset-0 z-50 flex h-screen w-full flex-col bg-surface"
+        transition:slideUp={{ duration: 320 }}
         onkeydown={onKeydown}
         role="form"
         tabindex="-1"
       >
         <!-- Grab handle: drag down (or click) to collapse -->
         <button
-          class="group flex w-full cursor-grab justify-center py-2 active:cursor-grabbing"
+          class="group flex w-full shrink-0 cursor-grab justify-center py-2 active:cursor-grabbing"
           aria-label="Collapse"
           onclick={collapse}
           use:verticalDrag={{ onResolve: (d) => d === 'down' && collapse() }}
@@ -80,7 +95,7 @@
           <span class="h-1 w-10 rounded-full bg-faint transition-colors group-hover:bg-muted"></span>
         </button>
 
-        <div class="mx-auto max-w-3xl px-6 pb-6">
+        <div class="mx-auto flex w-full min-h-0 max-w-3xl flex-1 flex-col px-6 pb-6">
           <!-- Title -->
           <input
             class="w-full bg-transparent text-2xl font-semibold tracking-tight text-text placeholder:text-faint focus:outline-none"
@@ -98,13 +113,12 @@
             <DatePicker bind:value={app.draftDateKey} />
           </div>
 
-          <!-- Body -->
-          <textarea
-            class="mt-4 max-h-[44vh] min-h-[7rem] w-full resize-none overflow-y-auto bg-transparent font-sans text-[0.95rem] leading-relaxed text-text placeholder:text-faint focus:outline-none"
+          <!-- Body — Notion-style live Markdown formatting -->
+          <RichEditor
+            class="mt-4 min-h-0 w-full flex-1 cursor-text overflow-y-auto"
             placeholder="Write today's chapter… Markdown is welcome."
             bind:value={app.draftContent}
-            use:autogrow
-          ></textarea>
+          />
 
           <!-- Actions -->
           <div class="mt-4 flex items-center justify-between gap-3">

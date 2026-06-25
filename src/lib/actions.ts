@@ -1,22 +1,5 @@
 /** Small reusable Svelte actions for the UI's tactile interactions. */
 
-/** Make a <textarea> grow with its content instead of scrolling. */
-export function autogrow(node: HTMLTextAreaElement) {
-  const resize = () => {
-    node.style.height = 'auto';
-    node.style.height = `${node.scrollHeight}px`;
-  };
-  node.addEventListener('input', resize);
-  // Resize once mounted and after fonts settle.
-  requestAnimationFrame(resize);
-  return {
-    update: resize,
-    destroy() {
-      node.removeEventListener('input', resize);
-    },
-  };
-}
-
 /**
  * Call `onOutside` when a pointer press lands outside `node` — used to dismiss
  * lightweight popovers (e.g. the month/year picker) without a full backdrop.
