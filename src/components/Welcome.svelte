@@ -67,12 +67,12 @@
       <span class="text-sm font-medium text-text">
         {dragHover ? 'Release to open' : 'Initialize Vault from .ics'}
       </span>
-      <span class="text-xs text-faint">Drag &amp; drop a file here, or click to browse</span>
+      <span class="text-xs text-muted">Drag &amp; drop a file here, or click to browse</span>
     </button>
 
     <!-- Subtle skip -->
     <button
-      class="mt-7 text-xs text-faint underline-offset-4 transition-colors hover:text-muted hover:underline"
+      class="mt-7 text-xs text-muted underline-offset-4 transition-colors hover:text-text hover:underline"
       onclick={() => app.skipToBlank()}
       in:fade={{ duration: 600, delay: 420 }}
     >

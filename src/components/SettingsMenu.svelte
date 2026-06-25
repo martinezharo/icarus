@@ -46,7 +46,7 @@
 
       <!-- Current file -->
       <div class="mb-5 rounded-lg border border-slate bg-slate-soft px-3.5 py-3">
-        <p class="text-[0.7rem] font-medium uppercase tracking-wider text-faint">
+        <p class="text-[0.7rem] font-medium uppercase tracking-wider text-muted">
           Current file
         </p>
         {#if fileName}
@@ -54,7 +54,7 @@
         {:else}
           <p class="mt-1 text-sm text-muted">Blank canvas — not yet saved to a file</p>
         {/if}
-        <p class="mt-1 text-xs text-faint">
+        <p class="mt-1 text-xs text-muted">
           {app.entries.length}
           {app.entries.length === 1 ? 'entry' : 'entries'}
         </p>

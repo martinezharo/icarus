@@ -77,7 +77,7 @@
     <div
       class="flex items-center gap-2 rounded-lg border border-slate bg-slate-soft px-3 py-1.5 transition-colors focus-within:border-faint"
     >
-      <svg class="shrink-0 text-faint" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <svg class="shrink-0 text-muted" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
       <input
         bind:this={inputEl}
         bind:value={query}
@@ -86,10 +86,10 @@
         onkeydown={onKeydown}
         type="text"
         placeholder="Search entries…"
-        class="w-full bg-transparent text-sm text-text placeholder:text-faint focus:outline-none"
+        class="w-full bg-transparent text-sm text-text placeholder:text-muted focus:outline-none"
         spellcheck="false"
       />
-      <kbd class="hidden shrink-0 rounded border border-slate px-1.5 py-0.5 font-mono text-[0.65rem] text-faint sm:block">
+      <kbd class="hidden shrink-0 rounded border border-slate px-1.5 py-0.5 font-mono text-[0.65rem] text-muted sm:block">
         ⌘K
       </kbd>
     </div>

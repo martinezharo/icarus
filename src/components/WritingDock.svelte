@@ -98,7 +98,7 @@
         <div class="mx-auto flex w-full min-h-0 max-w-3xl flex-1 flex-col px-6 pb-6">
           <!-- Title -->
           <input
-            class="w-full bg-transparent text-2xl font-semibold tracking-tight text-text placeholder:text-faint focus:outline-none"
+            class="w-full bg-transparent text-2xl font-semibold tracking-tight text-text placeholder:text-muted focus:outline-none"
             placeholder="Title"
             bind:value={app.draftTitle}
           />
@@ -106,7 +106,7 @@
           <!-- Location / subtitle + date -->
           <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate pb-3">
             <input
-              class="min-w-0 flex-1 bg-transparent text-sm text-muted placeholder:text-faint focus:outline-none"
+              class="min-w-0 flex-1 bg-transparent text-sm text-muted placeholder:text-muted focus:outline-none"
               placeholder="Add a location or subtitle"
               bind:value={app.draftLocation}
             />

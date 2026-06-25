@@ -99,7 +99,7 @@
       <!-- Weekday labels -->
       <div class="grid grid-cols-7">
         {#each WEEKDAY_LABELS as label}
-          <div class="pb-1 text-center text-[0.6rem] font-medium uppercase tracking-wider text-faint">
+          <div class="pb-1 text-center text-[0.6rem] font-medium uppercase tracking-wider text-muted">
             {label}
           </div>
         {/each}

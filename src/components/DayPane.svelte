@@ -40,7 +40,7 @@
   >
     <header class="flex items-center justify-between border-b border-slate px-7 py-5">
       <div>
-        <p class="text-[0.7rem] font-medium uppercase tracking-wider text-faint">
+        <p class="text-[0.7rem] font-medium uppercase tracking-wider text-muted">
           {#if count > 1}
             Entry {safePage + 1} of {count}
           {:else}

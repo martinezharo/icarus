@@ -59,7 +59,7 @@
       aria-label="Saved drafts"
     >
       {#if sorted.length === 0}
-        <p class="px-3 py-6 text-center text-sm text-faint">No drafts yet.</p>
+        <p class="px-3 py-6 text-center text-sm text-muted">No drafts yet.</p>
       {:else}
         {#each sorted as draft (draft.id)}
           <div
@@ -76,12 +76,12 @@
               {#if preview(draft.content)}
                 <p class="truncate text-xs text-muted">{preview(draft.content)}</p>
               {/if}
-              <p class="mt-0.5 text-[0.7rem] text-faint">
+              <p class="mt-0.5 text-[0.7rem] text-muted">
                 {longDayLabel(keyToDate(draft.dateKey))}
               </p>
             </button>
             <button
-              class="shrink-0 rounded-md p-1 text-faint opacity-0 transition-all hover:bg-slate hover:text-red-400 group-hover:opacity-100"
+              class="shrink-0 rounded-md p-1 text-muted opacity-0 transition-all hover:bg-slate hover:text-red-400 group-hover:opacity-100"
               aria-label="Delete draft"
               onclick={() => askDelete(draft.id)}
             >

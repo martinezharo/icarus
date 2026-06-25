@@ -33,13 +33,13 @@
           >
             <span class="flex items-baseline justify-between gap-3">
               <span class="truncate text-sm font-medium text-text">{hit.entry.title}</span>
-              <span class="shrink-0 text-[0.7rem] text-faint">{longDayLabel(hit.entry.date)}</span>
+              <span class="shrink-0 text-[0.7rem] text-muted">{longDayLabel(hit.entry.date)}</span>
             </span>
             {#if hit.entry.location}
               <span class="truncate text-xs text-muted">{hit.entry.location}</span>
             {/if}
             {#if hit.entry.content}
-              <span class="truncate text-xs text-faint">{excerpt(hit.entry.content, 90)}</span>
+              <span class="truncate text-xs text-muted">{excerpt(hit.entry.content, 90)}</span>
             {/if}
           </button>
         </li>

@@ -14,8 +14,8 @@
   --color-surface: #101012; /* raised surfaces           */
   --color-slate: #27272a; /* borders / hover fills     */
   --color-slate-soft: #18181b; /* subtle panels         */
-  --color-muted: #71717a; /* secondary text / accents  */
-  --color-faint: #3f3f46; /* low-contrast lines        */
+  --color-muted: #8b8b94; /* secondary text (WCAG AA)   */
+  --color-faint: #3f3f46; /* borders / lines only       */
   --color-text: #fafafa; /* primary text              */
 
   --font-sans:
@@ -220,7 +220,7 @@
   /* Placeholder text shown while the editor is empty. */
   .ProseMirror p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);
-    color: var(--color-faint);
+    color: var(--color-muted);
     float: left;
     height: 0;
     pointer-events: none;
