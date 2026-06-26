@@ -27,7 +27,7 @@
 {#if app.selectedKey && dayDate}
   <!-- Backdrop -->
   <div
-    class="absolute inset-0 z-20 bg-ink/50 backdrop-blur-[1px]"
+    class="absolute inset-0 z-40 bg-ink/50 backdrop-blur-[1px]"
     transition:fade={{ duration: 180 }}
     onclick={() => app.closeDay()}
     role="presentation"
@@ -35,7 +35,7 @@
 
   <!-- Sliding reader pane -->
   <aside
-    class="absolute right-0 top-0 z-20 flex h-full w-full max-w-xl flex-col border-l border-slate bg-surface pb-16 shadow-2xl shadow-black/40"
+    class="absolute right-0 top-0 z-40 flex h-full w-full max-w-xl flex-col border-l border-slate bg-surface shadow-2xl shadow-black/40"
     transition:fly={{ x: 480, duration: 320, easing: cubicOut }}
   >
     <header class="flex items-center justify-between border-b border-slate px-7 py-5">
