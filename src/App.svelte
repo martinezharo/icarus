@@ -18,6 +18,8 @@
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       if (app.settingsOpen) app.settingsOpen = false;
+      else if (app.dockExpanded) app.collapseDock();
+      else if (app.readerFullscreen) app.readerFullscreen = false;
       else if (app.selectedKey) app.closeDay();
     };
     window.addEventListener('keydown', onKey);

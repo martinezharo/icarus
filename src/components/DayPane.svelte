@@ -52,13 +52,33 @@
           {longDayLabel(dayDate)}
         </h2>
       </div>
-      <button
-        class="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-slate hover:text-text"
-        aria-label="Close"
-        onclick={() => app.closeDay()}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-      </button>
+      <div class="flex items-center gap-1">
+        {#if entry}
+          <button
+            class="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-slate hover:text-text"
+            aria-label="Edit entry"
+            title="Edit entry"
+            onclick={() => entry && app.editEntry(entry)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <button
+            class="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-slate hover:text-text"
+            aria-label="View full screen"
+            title="View full screen"
+            onclick={() => (app.readerFullscreen = true)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3"/></svg>
+          </button>
+        {/if}
+        <button
+          class="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-slate hover:text-text"
+          aria-label="Close"
+          onclick={() => app.closeDay()}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
     </header>
 
     {#if count > 1}
@@ -120,4 +140,56 @@
     </div>
 
   </aside>
+
+  <!-- Distraction-free full-screen reader for the current entry. -->
+  {#if app.readerFullscreen && entry}
+    <div
+      class="fixed inset-0 z-50 overflow-y-auto bg-surface"
+      transition:fade={{ duration: 180 }}
+    >
+      <div
+        class="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate bg-surface/85 px-8 py-4 backdrop-blur"
+      >
+        <p class="truncate text-sm text-muted">
+          {longDayLabel(dayDate)}{#if count > 1} · Entry {safePage + 1} of {count}{/if}
+        </p>
+        <div class="flex shrink-0 items-center gap-1">
+          <button
+            class="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-slate hover:text-text"
+            aria-label="Edit entry"
+            title="Edit entry"
+            onclick={() => entry && app.editEntry(entry)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <button
+            class="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-slate hover:text-text"
+            aria-label="Exit full screen"
+            title="Exit full screen"
+            onclick={() => (app.readerFullscreen = false)}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3M3 16h3a2 2 0 0 1 2 2v3m13-5h-3a2 2 0 0 0-2 2v3"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="mx-auto max-w-3xl px-8 py-12">
+        {#key entry.uid}
+          <article in:fade={{ duration: 150 }}>
+            <h1 class="text-3xl font-semibold tracking-tight text-text">
+              {entry.title}
+            </h1>
+            {#if entry.location}
+              <p class="mt-2 text-base text-muted">{entry.location}</p>
+            {/if}
+            {#if entry.content}
+              <div class="mt-6">
+                <MarkdownView source={entry.content} />
+              </div>
+            {/if}
+          </article>
+        {/key}
+      </div>
+    </div>
+  {/if}
 {/if}

@@ -52,6 +52,8 @@ class AppStore {
   searchOpen = $state(false);
   /** The writing dock has two states: a collapsed bar, or fullscreen. */
   dockExpanded = $state(false);
+  /** Shows the currently-read entry full-screen in distraction-free mode. */
+  readerFullscreen = $state(false);
   settingsOpen = $state(false);
   busy = $state(false);
   toasts = $state<Toast[]>([]);
@@ -63,6 +65,9 @@ class AppStore {
   // True only when the editor was loaded from a previously saved draft (not a
   // brand-new entry that merely got autosaved). Gates the "Discard" action.
   draftOpened = $state(false);
+  // When set, the editor is revising this existing committed entry in place
+  // (preserving its UID) rather than creating a new one.
+  editingUid = $state<string | null>(null);
   draftTitle = $state('');
   draftLocation = $state('');
   draftContent = $state('');
@@ -167,28 +172,38 @@ class AppStore {
       return;
     }
 
-    const entry: DiaryEntry = {
-      uid: generateUid(),
+    const targetKey = this.draftDateKey;
+    const fields = {
       title: title || 'Untitled',
       content: this.draftContent,
       location: this.draftLocation.trim() || undefined,
       date: keyToDate(this.draftDateKey),
     };
-    const targetKey = this.draftDateKey;
 
-    this.entries = [...this.entries, entry];
-    buildSearchIndex(this.entries);
-
-    if (!this.filePath) {
-      const created = await this.chooseVaultLocation();
-      if (!created) {
-        this.toast(
-          'info',
-          'Saved in memory only — set a vault file to keep it.',
-        );
-      }
+    if (this.editingUid) {
+      // Revise the existing entry in place, keeping its UID.
+      const uid = this.editingUid;
+      this.entries = this.entries.map((e) =>
+        e.uid === uid ? { ...e, ...fields } : e,
+      );
+      buildSearchIndex(this.entries);
+      if (this.filePath) await this.persist();
     } else {
-      await this.persist();
+      const entry: DiaryEntry = { uid: generateUid(), ...fields };
+      this.entries = [...this.entries, entry];
+      buildSearchIndex(this.entries);
+
+      if (!this.filePath) {
+        const created = await this.chooseVaultLocation();
+        if (!created) {
+          this.toast(
+            'info',
+            'Saved in memory only — set a vault file to keep it.',
+          );
+        }
+      } else {
+        await this.persist();
+      }
     }
 
     // A committed entry must no longer linger as a draft.
@@ -197,8 +212,25 @@ class AppStore {
     this.resetEditor();
 
     this.selectedKey = targetKey;
-    this.currentMonth = startOfMonth(entry.date);
+    this.currentMonth = startOfMonth(keyToDate(targetKey));
     this.dockExpanded = false;
+  }
+
+  /**
+   * Load an existing committed entry back into the writing dock to revise it.
+   * On the next commit the entry is updated in place rather than duplicated.
+   */
+  editEntry(entry: DiaryEntry): void {
+    this.cancelDraftSave();
+    this.readerFullscreen = false;
+    this.editingUid = entry.uid;
+    this.draftId = null;
+    this.draftOpened = false;
+    this.draftTitle = entry.title;
+    this.draftLocation = entry.location ?? '';
+    this.draftContent = entry.content;
+    this.draftDateKey = dateKey(entry.date);
+    this.dockExpanded = true;
   }
 
   // --- drafts -------------------------------------------------------------
@@ -221,6 +253,7 @@ class AppStore {
 
   /** Clear the editor back to a fresh, unsaved draft. */
   resetEditor(): void {
+    this.editingUid = null;
     this.draftId = null;
     this.draftOpened = false;
     this.draftTitle = '';
@@ -251,6 +284,9 @@ class AppStore {
    * Empty editors are ignored so we never persist a blank draft.
    */
   async flushDraft(): Promise<void> {
+    // Revising an existing entry never spawns a draft — the source of truth is
+    // the committed entry itself, so we don't duplicate it in the drafts list.
+    if (this.editingUid) return;
     if (!this.hasEditorContent()) return;
     if (!this.draftId) this.draftId = crypto.randomUUID();
 
@@ -293,6 +329,7 @@ class AppStore {
     await this.flushDraftNow();
     const d = this.drafts.find((x) => x.id === id);
     if (!d) return;
+    this.editingUid = null;
     this.draftId = d.id;
     this.draftOpened = true;
     this.draftTitle = d.title;
@@ -398,12 +435,27 @@ class AppStore {
     }
   }
 
+  /**
+   * Collapse the writing dock back to its bar. Mid-edit this acts as "cancel"
+   * (the source entry is untouched until commit); otherwise it flushes the
+   * in-progress draft so nothing is lost while collapsed.
+   */
+  collapseDock(): void {
+    if (this.editingUid) {
+      this.resetEditor();
+    } else {
+      void this.flushDraftNow();
+    }
+    this.dockExpanded = false;
+  }
+
   // --- navigation ---------------------------------------------------------
   selectDay(key: string): void {
     this.selectedKey = key;
   }
   closeDay(): void {
     this.selectedKey = null;
+    this.readerFullscreen = false;
   }
   navigateMonth(delta: number): void {
     this.currentMonth = addMonths(this.currentMonth, delta);

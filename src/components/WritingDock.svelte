@@ -47,9 +47,7 @@
     app.dockExpanded = true;
   }
   function collapse() {
-    // Flush before hiding so nothing is lost if the app closes while collapsed.
-    void app.flushDraftNow();
-    app.dockExpanded = false;
+    app.collapseDock();
   }
 
   async function commit() {
@@ -62,9 +60,9 @@
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       commit();
-    } else if (e.key === 'Escape') {
-      collapse();
     }
+    // Escape is handled globally (App.svelte) so it collapses the dock in the
+    // same priority order as the other overlays.
   }
 </script>
 
@@ -123,31 +121,42 @@
           <!-- Actions -->
           <div class="mt-4 flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
-              <DraftsMenu align="left" />
-              {#if app.draftOpened}
+              {#if app.editingUid}
                 <button
-                  class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-red-400/10 hover:text-red-400"
-                  onclick={askDiscard}
+                  class="rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-slate hover:text-text"
+                  onclick={collapse}
                 >
-                  Discard
+                  Cancel
                 </button>
+              {:else}
+                <DraftsMenu align="left" />
+                {#if app.draftOpened}
+                  <button
+                    class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-red-400/10 hover:text-red-400"
+                    onclick={askDiscard}
+                  >
+                    Discard
+                  </button>
+                {/if}
               {/if}
             </div>
 
             <div class="flex items-center gap-2">
-              <button
-                class="rounded-lg border border-slate px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-slate hover:text-text disabled:opacity-50"
-                onclick={() => app.saveDraftAndReset()}
-                disabled={saving}
-              >
-                Save as draft
-              </button>
+              {#if !app.editingUid}
+                <button
+                  class="rounded-lg border border-slate px-3 py-2 text-sm font-medium text-muted transition-colors hover:bg-slate hover:text-text disabled:opacity-50"
+                  onclick={() => app.saveDraftAndReset()}
+                  disabled={saving}
+                >
+                  Save as draft
+                </button>
+              {/if}
               <button
                 class="flex items-center gap-2 rounded-lg bg-text px-4 py-2 text-sm font-medium text-ink transition-opacity hover:opacity-90 disabled:opacity-50"
                 onclick={commit}
                 disabled={saving}
               >
-                <span>{saving ? 'Saving…' : 'Commit entry'}</span>
+                <span>{saving ? 'Saving…' : app.editingUid ? 'Save changes' : 'Commit entry'}</span>
                 <span class="hidden items-center gap-1 text-ink/60 sm:flex">
                   <kbd class="font-mono text-xs">⌘/Ctrl</kbd>
                   <kbd class="font-mono text-xs">↵</kbd>
