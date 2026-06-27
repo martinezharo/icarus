@@ -3,7 +3,9 @@
   import { cubicOut } from 'svelte/easing';
   import { app } from '../lib/store.svelte';
   import { keyToDate, longDayLabel } from '../lib/date';
+  import { splitTerms, countMatches } from '../lib/highlight';
   import MarkdownView from './MarkdownView.svelte';
+  import Highlight from './Highlight.svelte';
 
   const dayDate = $derived(app.selectedKey ? keyToDate(app.selectedKey) : null);
 
@@ -14,10 +16,33 @@
   const safePage = $derived(Math.min(page, Math.max(0, count - 1)));
   const entry = $derived(app.selectedEntries[safePage] ?? null);
 
+  // Terms to highlight when this day was opened from a search hit.
+  const terms = $derived(splitTerms(app.searchHighlight));
+  // Match count reported by the rendered Markdown body (title/location added).
+  let contentMatches = $state(0);
+  const matchCount = $derived(
+    (entry ? countMatches(entry.title, terms) : 0) +
+      (entry?.location ? countMatches(entry.location, terms) : 0) +
+      contentMatches,
+  );
+
+  // On day change, jump to the searched entry (if any) rather than the first.
   $effect(() => {
     app.selectedKey; // re-run on day change
-    page = 0;
+    const uid = app.focusEntryUid;
+    const idx = uid ? app.selectedEntries.findIndex((e) => e.uid === uid) : -1;
+    page = idx >= 0 ? idx : 0;
   });
+
+  // Scroll the first highlighted hit in the body into view once it's rendered.
+  function onBodyHighlight(c: number, first: HTMLElement | null) {
+    contentMatches = c;
+    if (first) {
+      requestAnimationFrame(() =>
+        first.scrollIntoView({ block: 'center', behavior: 'smooth' }),
+      );
+    }
+  }
 
   function go(delta: number) {
     page = Math.min(Math.max(safePage + delta, 0), count - 1);
@@ -51,6 +76,16 @@
         <h2 class="mt-0.5 text-base font-semibold tracking-tight text-text">
           {longDayLabel(dayDate)}
         </h2>
+        {#if terms.length}
+          <p class="mt-1 text-[0.7rem] font-medium text-muted">
+            {#if matchCount > 0}
+              <span class="text-text">{matchCount}</span>
+              {matchCount === 1 ? 'match' : 'matches'} for “{app.searchHighlight}”
+            {:else}
+              No matches for “{app.searchHighlight}” here
+            {/if}
+          </p>
+        {/if}
       </div>
       <div class="flex items-center gap-1">
         {#if entry}
@@ -124,14 +159,16 @@
         {#key entry.uid}
           <article in:fade={{ duration: 150 }}>
             <h1 class="text-xl font-semibold tracking-tight text-text">
-              {entry.title}
+              <Highlight text={entry.title} {terms} />
             </h1>
             {#if entry.location}
-              <p class="mt-1 text-sm text-muted">{entry.location}</p>
+              <p class="mt-1 text-sm text-muted">
+                <Highlight text={entry.location} {terms} />
+              </p>
             {/if}
             {#if entry.content}
               <div class="mt-4">
-                <MarkdownView source={entry.content} />
+                <MarkdownView source={entry.content} {terms} onhighlight={onBodyHighlight} />
               </div>
             {/if}
           </article>
@@ -177,14 +214,16 @@
         {#key entry.uid}
           <article in:fade={{ duration: 150 }}>
             <h1 class="text-3xl font-semibold tracking-tight text-text">
-              {entry.title}
+              <Highlight text={entry.title} {terms} />
             </h1>
             {#if entry.location}
-              <p class="mt-2 text-base text-muted">{entry.location}</p>
+              <p class="mt-2 text-base text-muted">
+                <Highlight text={entry.location} {terms} />
+              </p>
             {/if}
             {#if entry.content}
               <div class="mt-6">
-                <MarkdownView source={entry.content} />
+                <MarkdownView source={entry.content} {terms} onhighlight={onBodyHighlight} />
               </div>
             {/if}
           </article>

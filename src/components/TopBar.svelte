@@ -20,7 +20,7 @@
   });
 
   function choose(entry: DiaryEntry) {
-    app.jumpToEntry(entry);
+    app.jumpToEntry(entry, query);
     query = '';
     inputEl?.blur();
   }

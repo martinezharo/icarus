@@ -49,6 +49,11 @@ class AppStore {
   selectedKey = $state<string | null>(null);
   currentMonth = $state<Date>(startOfMonth(new Date()));
 
+  /** When a day pane is opened from a search hit, the term(s) to highlight. */
+  searchHighlight = $state('');
+  /** UID of the entry to focus inside the opened day (from a search hit). */
+  focusEntryUid = $state<string | null>(null);
+
   searchOpen = $state(false);
   /** The writing dock has two states: a collapsed bar, or fullscreen. */
   dockExpanded = $state(false);
@@ -449,11 +454,19 @@ class AppStore {
     this.dockExpanded = false;
   }
 
+  /** Drop any active search highlight / focus (manual navigation). */
+  private clearSearchFocus(): void {
+    this.searchHighlight = '';
+    this.focusEntryUid = null;
+  }
+
   // --- navigation ---------------------------------------------------------
   selectDay(key: string): void {
+    this.clearSearchFocus();
     this.selectedKey = key;
   }
   closeDay(): void {
+    this.clearSearchFocus();
     this.selectedKey = null;
     this.readerFullscreen = false;
   }
@@ -465,14 +478,20 @@ class AppStore {
     this.currentMonth = new Date(year, month, 1);
   }
   goToToday(): void {
+    this.clearSearchFocus();
     this.currentMonth = startOfMonth(new Date());
     this.selectedKey = dateKey(new Date());
   }
 
-  /** Jump from a search hit straight to its day. */
-  jumpToEntry(entry: DiaryEntry): void {
+  /**
+   * Jump from a search hit straight to its day, focusing that entry and
+   * carrying the query so the reader can highlight what was searched for.
+   */
+  jumpToEntry(entry: DiaryEntry, query = ''): void {
     this.currentMonth = startOfMonth(entry.date);
     this.selectedKey = dateKey(entry.date);
+    this.focusEntryUid = entry.uid;
+    this.searchHighlight = query;
     this.searchOpen = false;
   }
 

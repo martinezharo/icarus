@@ -212,6 +212,18 @@
   }
 
   /* ---------------------------------------------------------------- */
+  /* Search-term highlight — used by the reader when opened from search */
+  /* ---------------------------------------------------------------- */
+  mark.search-hl {
+    background: color-mix(in oklab, #fde047 78%, transparent);
+    color: var(--color-ink);
+    border-radius: 0.2rem;
+    padding: 0.02em 0.12em;
+    /* the first hit gets scrolled into view; keep some breathing room */
+    scroll-margin: 2rem;
+  }
+
+  /* ---------------------------------------------------------------- */
   /* WYSIWYG editor (TipTap/ProseMirror) — shares .markdown typography */
   /* ---------------------------------------------------------------- */
   .ProseMirror {
