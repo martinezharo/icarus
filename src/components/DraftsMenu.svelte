@@ -2,7 +2,7 @@
   import { scale } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { app } from '../lib/store.svelte';
-  import { clickOutside } from '../lib/actions';
+  import { clickOutside, trapFocus } from '../lib/actions';
   import { keyToDate, longDayLabel } from '../lib/date';
   import { truncateText } from '../lib/text';
 
@@ -53,6 +53,7 @@
         {align === 'right' ? 'right-0 origin-bottom-right' : 'left-0 origin-bottom-left'}"
       transition:scale={{ duration: 160, start: 0.95, easing: cubicOut }}
       use:clickOutside={() => (open = false)}
+      use:trapFocus={() => (open = false)}
       role="dialog"
       aria-label="Saved drafts"
     >

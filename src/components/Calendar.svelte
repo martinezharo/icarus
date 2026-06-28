@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import { scale } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { app } from '../lib/store.svelte';
-  import { clickOutside } from '../lib/actions';
+  import { clickOutside, trapFocus } from '../lib/actions';
   import {
     dateKey,
+    keyToDate,
     isSameDay,
     monthGrid,
     monthLabel,
@@ -17,6 +19,68 @@
   const grid = $derived(monthGrid(app.currentMonth, app.weekStart));
   const weekdays = $derived(weekdayLabels(app.weekStart));
   const monthsShort = monthShortLabels();
+
+  // --- keyboard navigation (roving tabindex) ------------------------------
+  // The grid is one tab stop: a single cell is tabbable at a time and the arrow
+  // keys move focus between days, paging to the next/previous month at the edges.
+  let gridEl = $state<HTMLElement | null>(null);
+  let focusedKey = $state<string | null>(null);
+
+  function inCurrentMonthKey(key: string): boolean {
+    const d = keyToDate(key);
+    return (
+      d.getMonth() === app.currentMonth.getMonth() &&
+      d.getFullYear() === app.currentMonth.getFullYear()
+    );
+  }
+
+  // The single cell that carries tabindex=0. Prefers the day the user last
+  // focused, then the selected day, then today, then the 1st of the month.
+  const rovingKey = $derived.by(() => {
+    if (focusedKey && inCurrentMonthKey(focusedKey)) return focusedKey;
+    if (app.selectedKey && inCurrentMonthKey(app.selectedKey)) return app.selectedKey;
+    const todayKey = dateKey(today);
+    if (inCurrentMonthKey(todayKey)) return todayKey;
+    return dateKey(app.currentMonth);
+  });
+
+  function addDays(d: Date, n: number): Date {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  }
+
+  // Move focus to a day, switching the visible month first if it falls outside.
+  async function focusDay(target: Date): Promise<void> {
+    const key = dateKey(target);
+    if (
+      target.getMonth() !== app.currentMonth.getMonth() ||
+      target.getFullYear() !== app.currentMonth.getFullYear()
+    ) {
+      app.goToMonth(target.getFullYear(), target.getMonth());
+    }
+    focusedKey = key;
+    await tick();
+    gridEl?.querySelector<HTMLElement>(`[data-daykey="${key}"]`)?.focus();
+  }
+
+  function onDayKeydown(e: KeyboardEvent): void {
+    const base = keyToDate(focusedKey ?? rovingKey);
+    // Offset of `base` within its week, honouring the configured week start.
+    const dow = (base.getDay() - app.weekStart + 7) % 7;
+    let target: Date | null = null;
+    switch (e.key) {
+      case 'ArrowLeft': target = addDays(base, -1); break;
+      case 'ArrowRight': target = addDays(base, 1); break;
+      case 'ArrowUp': target = addDays(base, -7); break;
+      case 'ArrowDown': target = addDays(base, 7); break;
+      case 'Home': target = addDays(base, -dow); break;
+      case 'End': target = addDays(base, 6 - dow); break;
+      case 'PageUp': target = new Date(base.getFullYear(), base.getMonth() - 1, base.getDate()); break;
+      case 'PageDown': target = new Date(base.getFullYear(), base.getMonth() + 1, base.getDate()); break;
+      default: return;
+    }
+    e.preventDefault();
+    void focusDay(target);
+  }
 
   // --- month / year picker ------------------------------------------------
   let pickerOpen = $state(false);
@@ -93,6 +157,7 @@
           class="absolute left-0 top-full z-50 mt-2 w-72 origin-top-left rounded-2xl border border-slate bg-surface p-3 shadow-2xl shadow-black/50"
           transition:scale={{ duration: 160, start: 0.95, easing: cubicOut }}
           use:clickOutside={() => (pickerOpen = false)}
+          use:trapFocus={() => (pickerOpen = false)}
           role="dialog"
           aria-label="Select month and year"
         >
@@ -162,18 +227,23 @@
   </div>
 
   <!-- Day grid -->
-  <div class="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-px">
-    {#each grid as day (day.toISOString())}
+  <div class="grid min-h-0 flex-1 grid-cols-7 grid-rows-6 gap-px" bind:this={gridEl}>
+    {#each grid as day (dateKey(day))}
       {@const count = entryCount(day)}
       {@const muted = !inCurrentMonth(day)}
+      {@const key = dateKey(day)}
       <button
-        class="group relative flex flex-col rounded-xl border border-transparent p-2 text-left transition-all duration-200 hover:border-slate hover:bg-slate-soft
+        class="group relative flex flex-col rounded-xl border border-transparent p-2 text-left transition-all duration-200 hover:border-slate hover:bg-slate-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-faint
           {isSelected(day) ? 'border-faint bg-slate-soft ring-1 ring-faint' : ''}
           {muted ? 'opacity-35' : ''}"
+        data-daykey={key}
+        tabindex={key === rovingKey ? 0 : -1}
         aria-label={dayLabel(day)}
         aria-pressed={isSelected(day)}
         aria-current={isSameDay(day, today) ? 'date' : undefined}
-        onclick={() => app.selectDay(dateKey(day))}
+        onclick={() => { focusedKey = key; app.selectDay(key); }}
+        onfocus={() => (focusedKey = key)}
+        onkeydown={onDayKeydown}
       >
         <div class="flex items-center gap-1.5">
           <span
