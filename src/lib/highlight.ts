@@ -8,6 +8,7 @@
  * Matching is a plain case-insensitive substring match per query term; it does
  * not try to mirror Fuse.js fuzziness, only to surface what the user typed.
  */
+import { flattenText, truncateText } from './text';
 
 const HL_CLASS = 'search-hl';
 
@@ -72,11 +73,11 @@ export function hasTerm(text: string, terms: string[]): boolean {
  * lines). Falls back to the start of the text when nothing matches literally.
  */
 export function snippetAround(text: string, terms: string[], radius = 70): string {
-  const clean = (text ?? '').replace(/\s+/g, ' ').trim();
+  const clean = flattenText(text);
   if (!clean) return '';
   const re = termsRegex(terms);
   const m = re ? re.exec(clean) : null;
-  if (!m) return clean.length > radius * 2 ? `${clean.slice(0, radius * 2 - 1)}…` : clean;
+  if (!m) return truncateText(clean, radius * 2);
   const start = Math.max(0, m.index - radius);
   const end = Math.min(clean.length, m.index + m[0].length + radius);
   return `${start > 0 ? '…' : ''}${clean.slice(start, end)}${end < clean.length ? '…' : ''}`;

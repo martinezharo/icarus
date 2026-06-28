@@ -4,6 +4,7 @@
   import { app } from '../lib/store.svelte';
   import { clickOutside } from '../lib/actions';
   import { keyToDate, longDayLabel } from '../lib/date';
+  import { truncateText } from '../lib/text';
 
   // Anchor the popover to the left or right edge of the trigger button.
   let { align = 'right' }: { align?: 'left' | 'right' } = $props();
@@ -15,10 +16,7 @@
     [...app.drafts].sort((a, b) => b.updatedAt - a.updatedAt),
   );
 
-  function preview(text: string): string {
-    const flat = text.replace(/\s+/g, ' ').trim();
-    return flat.length > 80 ? `${flat.slice(0, 80)}…` : flat;
-  }
+  const preview = (text: string) => truncateText(text, 80);
 
   async function choose(id: string) {
     await app.openDraft(id);
