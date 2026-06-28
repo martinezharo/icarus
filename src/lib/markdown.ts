@@ -13,8 +13,28 @@ const md = new MarkdownIt({
   breaks: true, // single newlines become <br>, matching a diarying feel
 });
 
-// Open links in the same webview but never let them navigate away from the app
-// shell; Tauri intercepts external schemes. We strip target to keep it simple.
+// Harden every generated anchor so a click can never navigate the webview
+// away from the app shell: external URLs open in the system browser via the
+// `opener` plugin (see MarkdownView) and `rel="noopener noreferrer"` is the
+// belt-and-braces fallback for any other rendering path.
+const mdLinkOpen =
+  md.renderer.rules.link_open ??
+  ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options));
+
+md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+  const token = tokens[idx];
+  const href = token.attrGet('href') ?? '';
+  token.attrSet('target', '_blank');
+  token.attrSet('rel', 'noopener noreferrer');
+  // Tauri intercepts `tauri://` etc., but everything else (http/https/mailto)
+  // must be opened externally. We only forward the schemes we trust.
+  if (!/^(https?:|mailto:|tel:)/i.test(href)) {
+    // Strip the href so the click does nothing dangerous in the webview.
+    token.attrSet('href', '#');
+  }
+  return mdLinkOpen(tokens, idx, options, env, self);
+};
+
 export function renderMarkdown(source: string): string {
   const dirty = md.render(source ?? '');
   return DOMPurify.sanitize(dirty, {
@@ -22,13 +42,4 @@ export function renderMarkdown(source: string): string {
     FORBID_TAGS: ['style', 'form', 'input'],
     FORBID_ATTR: ['style', 'onerror', 'onload'],
   });
-}
-
-/** Plain-text excerpt for compact previews (search results, list rows). */
-export function excerpt(source: string, max = 140): string {
-  const text = (source ?? '')
-    .replace(/[#>*_`~\-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
