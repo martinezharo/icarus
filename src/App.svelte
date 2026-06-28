@@ -26,7 +26,8 @@
     window.addEventListener('keydown', onKey);
 
     // Last-chance draft flush when the window is hidden or about to close, so
-    // an in-progress entry is never lost to a quit or a power cut.
+    // an in-progress entry is never lost to a quit or a power cut. These web
+    // handlers can't await, so they're a best-effort fallback.
     const flush = () => void app.flushDraftNow();
     const onVisibility = () => {
       if (document.hidden) flush();
@@ -35,11 +36,30 @@
     window.addEventListener('pagehide', flush);
     window.addEventListener('beforeunload', flush);
 
+    // The reliable path under Tauri: intercept the window close, finish the
+    // (async) flush, then actually close. Unlike `beforeunload`, this can wait
+    // for the write to complete, so a draft is never lost on quit.
+    let unlistenClose: (() => void) | undefined;
+    void (async () => {
+      try {
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const win = getCurrentWindow();
+        unlistenClose = await win.onCloseRequested(async (event) => {
+          event.preventDefault();
+          await app.flushDraftNow();
+          await win.destroy();
+        });
+      } catch {
+        // Not running under Tauri (e.g. `pnpm dev`) — rely on the web handlers.
+      }
+    })();
+
     return () => {
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('pagehide', flush);
       window.removeEventListener('beforeunload', flush);
+      unlistenClose?.();
     };
   });
 </script>
