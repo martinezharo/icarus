@@ -30,13 +30,27 @@ export function addMonths(d: Date, n: number): Date {
   return new Date(d.getFullYear(), d.getMonth() + n, 1);
 }
 
-const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+/**
+ * Which weekday the calendar grid starts on: 0 = Sunday, 1 = Monday. Stored as
+ * a user preference so the grid can match local convention.
+ */
+export type WeekStart = 0 | 1;
 
+// All visible month/day names come from `Intl` so they follow the system locale
+// instead of being hardcoded in English. Formatters are created once and reused.
+const fmtMonthYear = new Intl.DateTimeFormat(undefined, {
+  month: 'long',
+  year: 'numeric',
+});
+const fmtMonthShort = new Intl.DateTimeFormat(undefined, { month: 'short' });
+const fmtWeekdayShort = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+
+// 1 Jan 2023 was a Sunday — a convenient anchor for naming weekdays by index.
+const WEEKDAY_ANCHOR = new Date(2023, 0, 1);
+
+/** Localised "<Month> <year>" label, e.g. "June 2026" / "junio de 2026". */
 export function monthLabel(d: Date): string {
-  return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  return fmtMonthYear.format(d);
 }
 
 /** Long, readable label for a specific day, e.g. "Monday, 8 June 2026". */
@@ -49,27 +63,38 @@ export function longDayLabel(d: Date): string {
   });
 }
 
+/** Localised short month names (Jan…Dec), for the header month/year picker. */
+export function monthShortLabels(): string[] {
+  return Array.from({ length: 12 }, (_, m) =>
+    fmtMonthShort.format(new Date(2023, m, 1)),
+  );
+}
+
+/**
+ * Localised short weekday names ordered for the given week start, so the column
+ * headers line up with `monthGrid(..., weekStart)`.
+ */
+export function weekdayLabels(weekStart: WeekStart = 1): string[] {
+  return Array.from({ length: 7 }, (_, i) =>
+    fmtWeekdayShort.format(
+      new Date(2023, 0, WEEKDAY_ANCHOR.getDate() + ((weekStart + i) % 7)),
+    ),
+  );
+}
+
 /**
  * The 6×7 grid of days to render for a month view, including the trailing days
- * of the previous month and leading days of the next so the grid is always full.
- * Week starts on Monday.
+ * of the previous month and leading days of the next so the grid is always
+ * full. `weekStart` chooses whether weeks begin on Monday (1) or Sunday (0).
  */
-export function monthGrid(monthStart: Date): Date[] {
-  const firstDow = (monthStart.getDay() + 6) % 7; // 0 = Monday
+export function monthGrid(monthStart: Date, weekStart: WeekStart = 1): Date[] {
+  const lead = (monthStart.getDay() - weekStart + 7) % 7;
   const start = new Date(
     monthStart.getFullYear(),
     monthStart.getMonth(),
-    1 - firstDow,
+    1 - lead,
   );
   return Array.from({ length: 42 }, (_, i) =>
     new Date(start.getFullYear(), start.getMonth(), start.getDate() + i),
   );
 }
-
-export const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-/** Short month names, for the compact header month/year picker. */
-export const MONTH_LABELS_SHORT = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-];

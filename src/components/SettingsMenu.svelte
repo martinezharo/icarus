@@ -11,6 +11,13 @@
   // Local confirmation step for the destructive "Forget vault" action.
   let confirmForget = $state(false);
 
+  // Localised long names for the two week-start choices (Sun = index 0).
+  const fmtWeekday = new Intl.DateTimeFormat(undefined, { weekday: 'long' });
+  const weekStartOptions = [
+    { value: 1 as const, label: fmtWeekday.format(new Date(2023, 0, 2)) }, // Monday
+    { value: 0 as const, label: fmtWeekday.format(new Date(2023, 0, 1)) }, // Sunday
+  ];
+
   async function forget() {
     await app.forgetVault();
     confirmForget = false;
@@ -99,6 +106,27 @@
             </span>
           </button>
         {/if}
+      </div>
+
+      <!-- Preferences -->
+      <div class="mt-5 border-t border-slate pt-5">
+        <p class="mb-2 text-[0.7rem] font-medium uppercase tracking-wider text-muted">
+          Week starts on
+        </p>
+        <div class="grid grid-cols-2 gap-2">
+          {#each weekStartOptions as opt (opt.value)}
+            <button
+              class="rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors
+                {app.weekStart === opt.value
+                  ? 'border-faint bg-slate text-text'
+                  : 'border-slate text-muted hover:bg-slate hover:text-text'}"
+              aria-pressed={app.weekStart === opt.value}
+              onclick={() => app.setWeekStart(opt.value)}
+            >
+              {opt.label}
+            </button>
+          {/each}
+        </div>
       </div>
     </div>
   </div>

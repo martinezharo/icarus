@@ -7,9 +7,9 @@ import {
   longDayLabel,
   monthGrid,
   monthLabel,
+  monthShortLabels,
   startOfMonth,
-  WEEKDAY_LABELS,
-  MONTH_LABELS_SHORT,
+  weekdayLabels,
 } from '../src/lib/date';
 
 describe('dateKey', () => {
@@ -85,9 +85,12 @@ describe('addMonths', () => {
 });
 
 describe('monthLabel', () => {
-  it('returns "<Month> <year>" in English', () => {
-    expect(monthLabel(new Date(2026, 0, 1))).toBe('January 2026');
-    expect(monthLabel(new Date(2026, 11, 1))).toBe('December 2026');
+  it('returns a localised "<Month> <year>" label', () => {
+    // Locale-agnostic: the year is always present and the label is non-empty.
+    const jan = monthLabel(new Date(2026, 0, 1));
+    expect(jan).toContain('2026');
+    expect(jan.length).toBeGreaterThan(4);
+    expect(monthLabel(new Date(2026, 11, 1))).toContain('2026');
   });
 });
 
@@ -108,10 +111,16 @@ describe('monthGrid', () => {
     expect(grid).toHaveLength(42);
   });
 
-  it('starts on a Monday', () => {
+  it('starts on a Monday by default', () => {
     const grid = monthGrid(new Date(2026, 5, 1)); // June 2026
     // 1 June 2026 is a Monday, so the grid starts on 1 June.
     expect(grid[0].getDay()).toBe(1);
+  });
+
+  it('honours a Sunday week start', () => {
+    const grid = monthGrid(new Date(2026, 5, 1), 0); // June 2026, Sunday-first
+    expect(grid[0].getDay()).toBe(0); // first cell is a Sunday
+    expect(grid).toHaveLength(42);
   });
 
   it('is contiguous (each day is +1 from the previous)', () => {
@@ -139,16 +148,28 @@ describe('monthGrid', () => {
   });
 });
 
-describe('WEEKDAY_LABELS / MONTH_LABELS_SHORT', () => {
-  it('exposes 7 English weekday labels starting on Monday', () => {
-    expect(WEEKDAY_LABELS).toHaveLength(7);
-    expect(WEEKDAY_LABELS[0]).toBe('Mon');
-    expect(WEEKDAY_LABELS[6]).toBe('Sun');
+describe('weekdayLabels', () => {
+  it('returns 7 labels ordered from the given week start', () => {
+    const monFirst = weekdayLabels(1);
+    const sunFirst = weekdayLabels(0);
+    expect(monFirst).toHaveLength(7);
+    expect(sunFirst).toHaveLength(7);
+    // Same set of names, just rotated: Monday-first starts where Sunday-first's
+    // second entry is.
+    expect(monFirst[0]).toBe(sunFirst[1]);
+    expect(sunFirst[0]).toBe(monFirst[6]);
   });
 
-  it('exposes 12 English short month labels', () => {
-    expect(MONTH_LABELS_SHORT).toHaveLength(12);
-    expect(MONTH_LABELS_SHORT[0]).toBe('Jan');
-    expect(MONTH_LABELS_SHORT[11]).toBe('Dec');
+  it('defaults to a Monday-first ordering', () => {
+    expect(weekdayLabels()).toEqual(weekdayLabels(1));
+  });
+});
+
+describe('monthShortLabels', () => {
+  it('returns 12 non-empty, distinct short month names', () => {
+    const labels = monthShortLabels();
+    expect(labels).toHaveLength(12);
+    expect(new Set(labels).size).toBe(12);
+    expect(labels.every((l) => l.length > 0)).toBe(true);
   });
 });

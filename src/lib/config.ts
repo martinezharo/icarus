@@ -4,9 +4,13 @@
  * vault on next launch. The store lives in the OS app-config directory.
  */
 import { load, type Store } from '@tauri-apps/plugin-store';
+import type { WeekStart } from './date';
+
+export type { WeekStart };
 
 const STORE_FILE = 'settings.json';
 const KEY_PATH = 'icsPath';
+const KEY_WEEK_START = 'weekStart';
 
 let storePromise: Promise<Store> | null = null;
 
@@ -32,5 +36,18 @@ export async function setSavedIcsPath(path: string): Promise<void> {
 export async function clearSavedIcsPath(): Promise<void> {
   const store = await getStore();
   await store.delete(KEY_PATH);
+  await store.save();
+}
+
+/** The preferred first day of the week (defaults to Monday). */
+export async function getSavedWeekStart(): Promise<WeekStart> {
+  const store = await getStore();
+  const value = await store.get<WeekStart>(KEY_WEEK_START);
+  return value === 0 ? 0 : 1;
+}
+
+export async function setSavedWeekStart(weekStart: WeekStart): Promise<void> {
+  const store = await getStore();
+  await store.set(KEY_WEEK_START, weekStart);
   await store.save();
 }

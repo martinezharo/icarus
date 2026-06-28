@@ -8,13 +8,15 @@
     isSameDay,
     monthGrid,
     monthLabel,
-    MONTH_LABELS_SHORT,
-    WEEKDAY_LABELS,
+    monthShortLabels,
+    weekdayLabels,
     longDayLabel,
   } from '../lib/date';
 
   const today = new Date();
-  const grid = $derived(monthGrid(app.currentMonth));
+  const grid = $derived(monthGrid(app.currentMonth, app.weekStart));
+  const weekdays = $derived(weekdayLabels(app.weekStart));
+  const monthsShort = monthShortLabels();
 
   // --- month / year picker ------------------------------------------------
   let pickerOpen = $state(false);
@@ -115,7 +117,7 @@
 
           <!-- Month grid -->
           <div class="grid grid-cols-3 gap-1.5">
-            {#each MONTH_LABELS_SHORT as label, month (month)}
+            {#each monthsShort as label, month (month)}
               <button
                 class="rounded-lg py-2 text-sm font-medium tabular-nums transition-colors
                   {isCurrentMonthCell(month)
@@ -152,7 +154,7 @@
 
   <!-- Weekday labels -->
   <div class="mb-2 grid grid-cols-7 gap-px">
-    {#each WEEKDAY_LABELS as label}
+    {#each weekdays as label}
       <div class="pb-1 text-center text-[0.7rem] font-medium uppercase tracking-wider text-muted">
         {label}
       </div>

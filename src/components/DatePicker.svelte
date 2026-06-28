@@ -2,6 +2,7 @@
   import { scale } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { clickOutside } from '../lib/actions';
+  import { app } from '../lib/store.svelte';
   import {
     dateKey,
     keyToDate,
@@ -10,13 +11,14 @@
     monthLabel,
     addMonths,
     startOfMonth,
-    WEEKDAY_LABELS,
+    weekdayLabels,
   } from '../lib/date';
 
   // Bound to a local `YYYY-MM-DD` key (e.g. app.draftDateKey).
   let { value = $bindable() }: { value: string } = $props();
 
   const today = new Date();
+  const weekdays = $derived(weekdayLabels(app.weekStart));
 
   let open = $state(false);
   // Resolve the bound key to a Date, falling back to today if it's missing.
@@ -25,7 +27,7 @@
   // while the user browses around before picking).
   let viewMonth = $state(startOfMonth(value ? keyToDate(value) : new Date()));
 
-  const grid = $derived(monthGrid(viewMonth));
+  const grid = $derived(monthGrid(viewMonth, app.weekStart));
 
   // Compact, locale-aware label for the trigger, e.g. "Mon, 8 Jun 2026".
   const triggerLabel = $derived(
@@ -98,7 +100,7 @@
 
       <!-- Weekday labels -->
       <div class="grid grid-cols-7">
-        {#each WEEKDAY_LABELS as label}
+        {#each weekdays as label}
           <div class="pb-1 text-center text-[0.6rem] font-medium uppercase tracking-wider text-muted">
             {label}
           </div>

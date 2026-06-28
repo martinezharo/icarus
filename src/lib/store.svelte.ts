@@ -33,6 +33,7 @@ import {
   indexUpdateEntry,
 } from './search';
 import { addMonths, dateKey, keyToDate, startOfMonth } from './date';
+import { getSavedWeekStart, setSavedWeekStart, type WeekStart } from './config';
 import { devError } from './log';
 
 type View = 'welcome' | 'main';
@@ -74,6 +75,9 @@ class AppStore {
   busy = $state(false);
   toasts = $state<Toast[]>([]);
 
+  /** First day of the calendar week (0 = Sunday, 1 = Monday). User preference. */
+  weekStart = $state<WeekStart>(1);
+
   // --- draft editor state -------------------------------------------------
   // The live contents of the writing dock. Kept here (not in the component) so
   // it can be autosaved and swapped between drafts from one place.
@@ -110,6 +114,7 @@ class AppStore {
   /** Decide the initial screen: reopen the saved vault, or show Welcome. */
   async init(): Promise<void> {
     void this.loadDraftsFromDisk();
+    void this.loadWeekStart();
     try {
       const saved = await getSavedIcsPath();
       if (saved && (await exists(saved))) {
@@ -268,6 +273,25 @@ class AppStore {
     } catch (err) {
       // Store plugin unavailable (e.g. plain `vite dev`) — drafts stay empty.
       devError('loadDraftsFromDisk: could not read persisted drafts', err);
+    }
+  }
+
+  /** Restore the saved week-start preference on boot (defaults to Monday). */
+  async loadWeekStart(): Promise<void> {
+    try {
+      this.weekStart = await getSavedWeekStart();
+    } catch (err) {
+      devError('loadWeekStart: could not read the week-start preference', err);
+    }
+  }
+
+  /** Change the first day of the week and persist it. */
+  async setWeekStart(weekStart: WeekStart): Promise<void> {
+    this.weekStart = weekStart;
+    try {
+      await setSavedWeekStart(weekStart);
+    } catch (err) {
+      devError('setWeekStart: could not persist the week-start preference', err);
     }
   }
 
