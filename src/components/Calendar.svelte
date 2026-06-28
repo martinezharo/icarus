@@ -10,6 +10,7 @@
     monthLabel,
     MONTH_LABELS_SHORT,
     WEEKDAY_LABELS,
+    longDayLabel,
   } from '../lib/date';
 
   const today = new Date();
@@ -47,6 +48,14 @@
   }
   function isSelected(d: Date): boolean {
     return app.selectedKey === dateKey(d);
+  }
+  // A screen-reader friendly label for a day cell: the full date plus the
+  // entry count, so the grid reads as "Monday 8 June 2026, 2 entries".
+  function dayLabel(d: Date): string {
+    const base = longDayLabel(d);
+    const n = entryCount(d);
+    if (n === 0) return base;
+    return `${base}, ${n} ${n === 1 ? 'entry' : 'entries'}`;
   }
 </script>
 
@@ -159,6 +168,9 @@
         class="group relative flex flex-col rounded-xl border border-transparent p-2 text-left transition-all duration-200 hover:border-slate hover:bg-slate-soft
           {isSelected(day) ? 'border-faint bg-slate-soft ring-1 ring-faint' : ''}
           {muted ? 'opacity-35' : ''}"
+        aria-label={dayLabel(day)}
+        aria-pressed={isSelected(day)}
+        aria-current={isSameDay(day, today) ? 'date' : undefined}
         onclick={() => app.selectDay(dateKey(day))}
       >
         <div class="flex items-center gap-1.5">
