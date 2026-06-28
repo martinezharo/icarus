@@ -59,6 +59,29 @@ export function countMatches(text: string, terms: string[]): number {
   return highlightSegments(text, terms).filter((s) => s.match).length;
 }
 
+/** Whether any term appears literally (case-insensitive) in `text`. */
+export function hasTerm(text: string, terms: string[]): boolean {
+  const re = termsRegex(terms);
+  return re ? re.test(text ?? '') : false;
+}
+
+/**
+ * Extract a compact preview of `text` centred on the first occurrence of any
+ * search term, clipped with ellipses where it was cut. This is what surfaces
+ * the actual matching text in a result row (vs. always showing the opening
+ * lines). Falls back to the start of the text when nothing matches literally.
+ */
+export function snippetAround(text: string, terms: string[], radius = 70): string {
+  const clean = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+  const re = termsRegex(terms);
+  const m = re ? re.exec(clean) : null;
+  if (!m) return clean.length > radius * 2 ? `${clean.slice(0, radius * 2 - 1)}…` : clean;
+  const start = Math.max(0, m.index - radius);
+  const end = Math.min(clean.length, m.index + m[0].length + radius);
+  return `${start > 0 ? '…' : ''}${clean.slice(start, end)}${end < clean.length ? '…' : ''}`;
+}
+
 /** Strip previously injected highlight marks, restoring plain text nodes. */
 export function clearHighlights(root: HTMLElement): void {
   root.querySelectorAll(`mark.${HL_CLASS}`).forEach((mark) => {

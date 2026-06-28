@@ -95,7 +95,7 @@
     </div>
 
     {#if open}
-      <SearchOverlay {hits} {activeIndex} onselect={choose} />
+      <SearchOverlay {hits} {activeIndex} {query} onselect={choose} />
     {/if}
   </div>
 
