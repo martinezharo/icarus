@@ -35,11 +35,37 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   return mdLinkOpen(tokens, idx, options, env, self);
 };
 
+// Rendering (markdown-it + DOMPurify) is pure for a given source, but it runs
+// on every reader re-render — paging through a day, reopening an entry, the
+// highlight effect, etc. A small LRU memoises the result keyed by the source
+// text itself, so editing an entry naturally invalidates its cache entry (the
+// key changes) while the bound size keeps memory in check for large vaults.
+const CACHE_LIMIT = 256;
+const cache = new Map<string, string>();
+
 export function renderMarkdown(source: string): string {
-  const dirty = md.render(source ?? '');
-  return DOMPurify.sanitize(dirty, {
+  const key = source ?? '';
+
+  const hit = cache.get(key);
+  if (hit !== undefined) {
+    // Touch: re-insert so the most-recently-used key sorts last (LRU order).
+    cache.delete(key);
+    cache.set(key, hit);
+    return hit;
+  }
+
+  const dirty = md.render(key);
+  const html = DOMPurify.sanitize(dirty, {
     USE_PROFILES: { html: true },
     FORBID_TAGS: ['style', 'form', 'input'],
     FORBID_ATTR: ['style', 'onerror', 'onload'],
   });
+
+  cache.set(key, html);
+  if (cache.size > CACHE_LIMIT) {
+    // Evict the least-recently-used entry (first key in insertion order).
+    const oldest = cache.keys().next().value;
+    if (oldest !== undefined) cache.delete(oldest);
+  }
+  return html;
 }
