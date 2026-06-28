@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { parseIcs, serializeIcs } from '../src/lib/ical';
+import { describe, it, expect, vi } from 'vitest';
+import { isInvalidDate, parseIcs, serializeIcs } from '../src/lib/ical';
 import type { DiaryEntry } from '../src/lib/types';
 import { dateKey } from '../src/lib/date';
 
@@ -77,5 +77,60 @@ describe('ical roundtrip', () => {
     const res = parseIcs('this is not iCalendar at all {{{');
     expect(res.ok).toBe(false);
     if (!res.ok) expect(typeof res.error).toBe('string');
+  });
+});
+
+describe('unparseable DTSTART', () => {
+  it('keeps the entry but flags it with the sentinel year instead of rewriting to today', () => {
+    // No DTSTART line at all: ical.js returns null and the parser must not
+    // quietly default to `new Date()` (which would re-date the entry).
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//test//EN',
+      'BEGIN:VEVENT',
+      'UID:orphan@icarus.diary',
+      'DTSTAMP:20260628T000000Z',
+      'SUMMARY:Mystery entry',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+
+    const res = parseIcs(ics);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.entries).toHaveLength(1);
+    const entry = res.entries[0];
+    expect(entry.title).toBe('Mystery entry');
+    expect(isInvalidDate(entry.date)).toBe(true);
+    // Crucially: the date is NOT "today". It is the sentinel year 1.
+    expect(entry.date.getFullYear()).not.toBe(new Date().getFullYear());
+  });
+
+  it('round-trips an entry flagged with the sentinel date without silently fixing it', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const ics = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//test//EN',
+      'BEGIN:VEVENT',
+      'UID:orphan2@icarus.diary',
+      'DTSTAMP:20260628T000000Z',
+      'SUMMARY:Still lost',
+      'END:VEVENT',
+      'END:VCALENDAR',
+    ].join('\r\n');
+    const res = parseIcs(ics);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+
+    const written = serializeIcs(res.entries);
+    const reparsed = parseIcs(written);
+    expect(reparsed.ok).toBe(true);
+    if (!reparsed.ok) return;
+    expect(reparsed.entries[0].title).toBe('Still lost');
+    // The date is still flagged after a round-trip — we never silently healed it.
+    expect(isInvalidDate(reparsed.entries[0].date)).toBe(true);
+    warn.mockRestore();
   });
 });

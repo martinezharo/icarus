@@ -31,13 +31,17 @@ function str(value: unknown): string | undefined {
  * Read the calendar date off a DTSTART value. We pull the literal calendar
  * components (year/month/day) rather than `toJSDate()` to avoid any timezone
  * drift across midnight — the diary is day-granular by design.
+ *
+ * Returns `null` if the value is missing or unparseable. Callers MUST handle
+ * that case explicitly (we never want to silently re-date a corrupt entry to
+ * "today" — the original day would be lost the next time we persist).
  */
-function dtToDate(value: unknown): Date {
+function dtToDate(value: unknown): Date | null {
   const t = value as { year?: number; month?: number; day?: number } | null;
   if (t && typeof t === 'object' && typeof t.year === 'number') {
     return new Date(t.year, (t.month ?? 1) - 1, t.day ?? 1);
   }
-  return new Date();
+  return null;
 }
 
 /**
@@ -52,22 +56,63 @@ export function parseIcs(text: string): ParseResult {
     const root = new ICAL.Component(jcal);
     const vevents = root.getAllSubcomponents('vevent');
 
+    let invalidDates = 0;
     const entries: DiaryEntry[] = vevents.map((ve) => {
-      const dtstart = ve.getFirstPropertyValue('dtstart');
+      const parsed = dtToDate(ve.getFirstPropertyValue('dtstart'));
+      if (parsed) {
+        return {
+          uid: str(ve.getFirstPropertyValue('uid')) ?? generateUid(),
+          title: str(ve.getFirstPropertyValue('summary')) ?? 'Untitled',
+          content: str(ve.getFirstPropertyValue('description')) ?? '',
+          location: str(ve.getFirstPropertyValue('location')),
+          date: parsed,
+        };
+      }
+      // Unreadable DTSTART: keep the entry (so the user doesn't lose its
+      // title/content) but flag it with a sentinel date and bump a counter.
+      // `serializeIcs` writes the sentinel back out as-is rather than
+      // silently rewriting it to "today" on the next save.
+      invalidDates++;
       return {
         uid: str(ve.getFirstPropertyValue('uid')) ?? generateUid(),
         title: str(ve.getFirstPropertyValue('summary')) ?? 'Untitled',
         content: str(ve.getFirstPropertyValue('description')) ?? '',
         location: str(ve.getFirstPropertyValue('location')),
-        date: dtToDate(dtstart),
+        date: new Date(INVALID_DATE_SENTINEL),
       };
     });
+
+    if (invalidDates > 0) {
+      // Surface the warning on the console so the operator can see it; the
+      // app itself stays alive and the entries are not silently lost.
+      console.warn(
+        `[ical] ${invalidDates} entr${invalidDates === 1 ? 'y has' : 'ies have'} an unparseable DTSTART — kept with placeholder date.`,
+      );
+    }
 
     return { ok: true, entries };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown parse error';
     return { ok: false, error: message };
   }
+}
+
+/**
+ * Sentinel year used to mark entries whose DTSTART could not be parsed.
+ *
+ * Year 9999 is used because (a) it round-trips cleanly through the
+ * iCalendar serialization used here, and (b) it is so far outside the range
+ * of any real diary entry that we can detect it deterministically without
+ * any extra metadata on the entry. JS Date handles it (with a UTC offset in
+ * the printed string) and ical.js writes `VALUE=DATE:99990101` and reads it
+ * back identically.
+ */
+export const INVALID_DATE_SENTINEL_YEAR = 9999;
+const INVALID_DATE_SENTINEL = new Date(INVALID_DATE_SENTINEL_YEAR, 0, 1).getTime();
+
+/** Whether `date` is the placeholder used for unparseable DTSTARTs. */
+export function isInvalidDate(date: Date): boolean {
+  return date.getFullYear() === INVALID_DATE_SENTINEL_YEAR;
 }
 
 /**
