@@ -14,6 +14,7 @@ import {
   exists,
 } from '@tauri-apps/plugin-fs';
 import { open, save } from '@tauri-apps/plugin-dialog';
+import { devError } from './log';
 
 const ICS_FILTERS = [{ name: 'iCalendar', extensions: ['ics'] }];
 
@@ -65,8 +66,9 @@ export async function writeIcsAtomic(
     // Clean up the orphaned temp file; ignore secondary failures.
     try {
       if (await exists(tmp)) await remove(tmp);
-    } catch {
+    } catch (cleanupErr) {
       /* nothing more we can safely do */
+      devError('writeIcsAtomic: failed to clean up the temp file', cleanupErr);
     }
     throw err;
   }

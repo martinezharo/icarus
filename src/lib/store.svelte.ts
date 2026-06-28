@@ -33,6 +33,7 @@ import {
   indexUpdateEntry,
 } from './search';
 import { addMonths, dateKey, keyToDate, startOfMonth } from './date';
+import { devError } from './log';
 
 type View = 'welcome' | 'main';
 
@@ -118,8 +119,9 @@ class AppStore {
         // The remembered file moved or was deleted — forget it gracefully.
         await clearSavedIcsPath();
       }
-    } catch {
+    } catch (err) {
       // Any boot failure simply falls through to the Welcome screen.
+      devError('init: failed to restore the saved vault', err);
     } finally {
       this.ready = true;
     }
@@ -263,8 +265,9 @@ class AppStore {
   async loadDraftsFromDisk(): Promise<void> {
     try {
       this.drafts = await loadDrafts();
-    } catch {
+    } catch (err) {
       // Store plugin unavailable (e.g. plain `vite dev`) — drafts stay empty.
+      devError('loadDraftsFromDisk: could not read persisted drafts', err);
     }
   }
 
@@ -328,8 +331,9 @@ class AppStore {
     this.drafts = [draft, ...rest];
     try {
       await persistDrafts(this.drafts);
-    } catch {
+    } catch (err) {
       // Persistence unavailable — keep it in memory at least.
+      devError('flushDraft: could not persist the draft list', err);
     }
   }
 
@@ -343,8 +347,9 @@ class AppStore {
     this.drafts = this.drafts.filter((d) => d.id !== id);
     try {
       await persistDrafts(this.drafts);
-    } catch {
+    } catch (err) {
       // ignore — list already updated in memory
+      devError('removeDraft: could not persist the draft list', err);
     }
   }
 
