@@ -35,8 +35,15 @@ export type ParseResult =
 /** Severity levels for user-facing toasts. */
 export type ToastLevel = 'info' | 'success' | 'error';
 
+/** An optional inline action rendered as a button inside a toast (e.g. Undo). */
+export interface ToastAction {
+  label: string;
+  run: () => void;
+}
+
 export interface Toast {
   id: number;
   level: ToastLevel;
   message: string;
+  action?: ToastAction;
 }

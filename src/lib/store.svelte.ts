@@ -5,7 +5,13 @@
  * import / export) — each of which keeps the in-memory model and the on-disk
  * `.ics` file in sync via an atomic write.
  */
-import type { DiaryEntry, StoredDraft, Toast, ToastLevel } from './types';
+import type {
+  DiaryEntry,
+  StoredDraft,
+  Toast,
+  ToastAction,
+  ToastLevel,
+} from './types';
 import { generateUid, parseIcs, serializeIcs } from './ical';
 import { loadDrafts, persistDrafts } from './drafts';
 import {
@@ -20,7 +26,12 @@ import {
   setSavedIcsPath,
   clearSavedIcsPath,
 } from './config';
-import { buildSearchIndex } from './search';
+import {
+  buildSearchIndex,
+  indexAddEntry,
+  indexRemoveEntry,
+  indexUpdateEntry,
+} from './search';
 import { addMonths, dateKey, keyToDate, startOfMonth } from './date';
 
 type View = 'welcome' | 'main';
@@ -187,17 +198,25 @@ class AppStore {
     };
 
     if (this.editingUid) {
-      // Revise the existing entry in place, keeping its UID.
+      // Revise the existing entry in place, keeping its UID. Snapshot the prior
+      // version first so the edit can be undone.
       const uid = this.editingUid;
-      this.entries = this.entries.map((e) =>
-        e.uid === uid ? { ...e, ...fields } : e,
-      );
-      buildSearchIndex(this.entries);
+      const previous = this.entries.find((e) => e.uid === uid);
+      const updated: DiaryEntry = { ...(previous as DiaryEntry), ...fields };
+      this.entries = this.entries.map((e) => (e.uid === uid ? updated : e));
+      indexUpdateEntry(updated);
       if (this.filePath) await this.persist();
+      if (previous) {
+        const snapshot = { ...previous };
+        this.toast('success', 'Entry updated', {
+          label: 'Undo',
+          run: () => void this.restoreEntry(snapshot),
+        });
+      }
     } else {
       const entry: DiaryEntry = { uid: generateUid(), ...fields };
       this.entries = [...this.entries, entry];
-      buildSearchIndex(this.entries);
+      indexAddEntry(entry);
 
       if (!this.filePath) {
         const created = await this.chooseVaultLocation();
@@ -405,10 +424,11 @@ class AppStore {
    * just deleted the thing they were reading.
    */
   async deleteEntry(uid: string): Promise<void> {
-    const target = this.entries.find((e) => e.uid === uid);
-    if (!target) return;
+    const index = this.entries.findIndex((e) => e.uid === uid);
+    if (index === -1) return;
+    const removed = this.entries[index];
     this.entries = this.entries.filter((e) => e.uid !== uid);
-    buildSearchIndex(this.entries);
+    indexRemoveEntry(uid);
     // If we were editing this entry, drop the editor state.
     if (this.editingUid === uid) this.resetEditor();
     // If the open day no longer has anything or the focused entry is gone,
@@ -418,7 +438,31 @@ class AppStore {
       this.closeDay();
     }
     if (this.filePath) await this.persist();
-    this.toast('info', 'Entry deleted');
+    this.toast('info', 'Entry deleted', {
+      label: 'Undo',
+      run: () => void this.restoreEntry(removed, index),
+    });
+  }
+
+  /**
+   * Put an entry back after an undo. Used for both flavours of undo: restoring
+   * a just-deleted entry (with its original position) and reverting an in-place
+   * edit (the entry is still present, so it's swapped back by UID).
+   */
+  private async restoreEntry(entry: DiaryEntry, index?: number): Promise<void> {
+    const exists = this.entries.some((e) => e.uid === entry.uid);
+    if (exists) {
+      // Revert an edit: swap the current version back to the snapshot.
+      this.entries = this.entries.map((e) => (e.uid === entry.uid ? entry : e));
+      indexUpdateEntry(entry);
+    } else {
+      // Re-insert a deleted entry at (or near) its former position.
+      const next = [...this.entries];
+      next.splice(Math.min(index ?? next.length, next.length), 0, entry);
+      this.entries = next;
+      indexAddEntry(entry);
+    }
+    if (this.filePath) await this.persist();
   }
 
   /** Write current entries to `filePath` atomically. Toasts on failure. */
@@ -537,10 +581,12 @@ class AppStore {
   }
 
   // --- toasts -------------------------------------------------------------
-  toast(level: ToastLevel, message: string): void {
+  toast(level: ToastLevel, message: string, action?: ToastAction): void {
     const id = ++toastSeq;
-    this.toasts = [...this.toasts, { id, level, message }];
-    setTimeout(() => this.dismiss(id), 3600);
+    this.toasts = [...this.toasts, { id, level, message, action }];
+    // Actionable toasts (e.g. "Undo") linger a little longer so there's time
+    // to react before they vanish.
+    setTimeout(() => this.dismiss(id), action ? 7000 : 3600);
   }
   dismiss(id: number): void {
     this.toasts = this.toasts.filter((t) => t.id !== id);

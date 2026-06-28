@@ -16,6 +16,13 @@
       ? { role: 'alert' as const, 'aria-live': 'assertive' as const }
       : { role: 'status' as const, 'aria-live': 'polite' as const };
   }
+
+  // Run a toast's inline action (e.g. Undo) and dismiss it immediately so it
+  // can't fire twice.
+  function runAction(toast: (typeof app.toasts)[number]) {
+    toast.action?.run();
+    app.dismiss(toast.id);
+  }
 </script>
 
 <!-- A polite live region for success/info; we render each error with an
@@ -34,6 +41,14 @@
     >
       <span class="h-1.5 w-1.5 rounded-full {dotColor[toast.level]}"></span>
       <span>{toast.message}</span>
+      {#if toast.action}
+        <button
+          class="-my-1 ml-1 rounded-md px-2 py-1 text-xs font-semibold text-text underline-offset-2 transition-colors hover:bg-slate hover:underline"
+          onclick={() => runAction(toast)}
+        >
+          {toast.action.label}
+        </button>
+      {/if}
     </div>
   {/each}
 </div>

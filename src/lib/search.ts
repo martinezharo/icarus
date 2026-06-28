@@ -26,9 +26,30 @@ const OPTIONS: import('fuse.js').IFuseOptions<DiaryEntry> = {
   minMatchCharLength: 2,
 };
 
-/** (Re)build the search index from the current entries. */
+/** (Re)build the search index from scratch — used on vault load / forget. */
 export function buildSearchIndex(entries: DiaryEntry[]): void {
   fuse = new Fuse(entries, OPTIONS);
+}
+
+/**
+ * Incremental index maintenance. Fuse can add/remove single records, which is
+ * far cheaper than rebuilding the whole index on every commit, edit, or delete.
+ * These are no-ops if the index hasn't been built yet (the next `buildSearchIndex`
+ * will pick up the current entries anyway).
+ */
+export function indexAddEntry(entry: DiaryEntry): void {
+  fuse?.add(entry);
+}
+
+export function indexRemoveEntry(uid: string): void {
+  fuse?.remove((doc) => doc.uid === uid);
+}
+
+/** Update an entry in place: drop the stale record, then add the new one. */
+export function indexUpdateEntry(entry: DiaryEntry): void {
+  if (!fuse) return;
+  fuse.remove((doc) => doc.uid === entry.uid);
+  fuse.add(entry);
 }
 
 /** Query the index. Returns ranked hits (best first); empty if no query/index. */
