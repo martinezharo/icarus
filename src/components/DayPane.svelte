@@ -150,7 +150,7 @@
       </div>
     {/if}
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-7 py-6">
+    <div class="min-h-0 flex-1 overflow-y-auto px-7 pt-6 pb-16">
       {#if !entry}
         <div class="flex h-full flex-col items-center justify-center text-center text-muted">
           <p class="text-sm">No entries on this day yet.</p>
