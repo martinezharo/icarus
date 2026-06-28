@@ -12,12 +12,12 @@ Tauri v2 · Vite · TypeScript · Svelte 5 · Tailwind v4. The Rust shell is int
 pnpm tauri:dev          # dev build with hot reload (WSLg env vars baked in)
 pnpm tauri:build        # production AppImage / .deb
 pnpm dev                # Vite only — no Tauri, useful for pure UI work in browser
-pnpm test               # vitest — unit tests for ical parsing and date helpers
+pnpm test               # vitest — unit tests for ical parsing, date helpers, and highlight
 pnpm test:watch         # vitest watch mode
 pnpm check              # svelte-check + TypeScript
 ```
 
-To run a single test file: `pnpm vitest run tests/ical.test.ts`
+To run a single test file: `pnpm vitest run tests/date.test.ts`
 
 The `tauri:dev` and `tauri:build` scripts include `WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1` to prevent a blank WebView window under WSLg.
 
@@ -52,7 +52,7 @@ A single `AppStore` class (exported as `app`) in `src/lib/store.svelte.ts` owns 
 
 ### Tests
 
-Only pure TS modules (ical, date helpers) are unit-tested in `tests/`. Vitest runs in Node environment with no Svelte/DOM setup. Tauri-dependent code (fs, config, drafts) is not unit-tested.
+Only pure TS modules (ical parsing/serialization, date helpers, search-term highlighting) are unit-tested in `tests/`. Vitest runs in Node environment with no Svelte/DOM setup. Tauri-dependent code (fs, config, drafts) is not unit-tested.
 
 ### Tailwind
 
