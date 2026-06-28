@@ -54,7 +54,6 @@ class AppStore {
   /** UID of the entry to focus inside the opened day (from a search hit). */
   focusEntryUid = $state<string | null>(null);
 
-  searchOpen = $state(false);
   /** The writing dock has two states: a collapsed bar, or fullscreen. */
   dockExpanded = $state(false);
   /** Shows the currently-read entry full-screen in distraction-free mode. */
@@ -82,6 +81,8 @@ class AppStore {
   drafts = $state<StoredDraft[]>([]);
   /** Id of the draft awaiting delete confirmation (null = dialog closed). */
   confirmDeleteId = $state<string | null>(null);
+  /** UID of the committed entry awaiting delete confirmation (null = closed). */
+  confirmDeleteUid = $state<string | null>(null);
 
   // Debounce handle for autosave (plain field — not reactive).
   private draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -379,6 +380,47 @@ class AppStore {
     if (this.draftId === id) this.resetEditor();
   }
 
+  // --- committed entry deletion -------------------------------------------
+  /**
+   * Show the confirmation dialog for a committed entry. Mirrors the draft
+   * delete flow so the destructive action is always one extra click away.
+   */
+  requestDeleteEntry(uid: string): void {
+    this.confirmDeleteUid = uid;
+  }
+  cancelDeleteEntry(): void {
+    this.confirmDeleteUid = null;
+  }
+  /** Apply the pending delete. Persists if a vault file is open. */
+  async confirmDeleteEntry(): Promise<void> {
+    const uid = this.confirmDeleteUid;
+    this.confirmDeleteUid = null;
+    if (!uid) return;
+    await this.deleteEntry(uid);
+  }
+
+  /**
+   * Remove a committed entry from memory and (if a vault is open) from disk.
+   * If the day pane was showing that entry on that day, close it: the user
+   * just deleted the thing they were reading.
+   */
+  async deleteEntry(uid: string): Promise<void> {
+    const target = this.entries.find((e) => e.uid === uid);
+    if (!target) return;
+    this.entries = this.entries.filter((e) => e.uid !== uid);
+    buildSearchIndex(this.entries);
+    // If we were editing this entry, drop the editor state.
+    if (this.editingUid === uid) this.resetEditor();
+    // If the open day no longer has anything or the focused entry is gone,
+    // close the pane — nothing to show.
+    if (this.focusEntryUid === uid) this.focusEntryUid = null;
+    if (this.selectedKey && this.entriesByDay.get(this.selectedKey)?.length === 0) {
+      this.closeDay();
+    }
+    if (this.filePath) await this.persist();
+    this.toast('info', 'Entry deleted');
+  }
+
   /** Write current entries to `filePath` atomically. Toasts on failure. */
   private async persist(): Promise<void> {
     if (!this.filePath) return;
@@ -492,7 +534,6 @@ class AppStore {
     this.selectedKey = dateKey(entry.date);
     this.focusEntryUid = entry.uid;
     this.searchHighlight = query;
-    this.searchOpen = false;
   }
 
   // --- toasts -------------------------------------------------------------

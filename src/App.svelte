@@ -9,6 +9,7 @@
   import WritingDock from './components/WritingDock.svelte';
   import SettingsMenu from './components/SettingsMenu.svelte';
   import DraftDeleteDialog from './components/DraftDeleteDialog.svelte';
+  import EntryDeleteDialog from './components/EntryDeleteDialog.svelte';
   import Toasts from './components/Toasts.svelte';
 
   onMount(() => {
@@ -62,4 +63,5 @@
 {/if}
 
 <DraftDeleteDialog />
+<EntryDeleteDialog />
 <Toasts />
