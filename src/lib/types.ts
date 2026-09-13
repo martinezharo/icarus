@@ -18,6 +18,8 @@ export interface DiaryEntry {
  */
 export interface StoredDraft {
   id: string;
+  /** UID of the committed entry this draft is revising, when applicable. */
+  editingUid?: string;
   title: string;
   location: string;
   content: string;
