@@ -113,7 +113,7 @@
 
           <!-- Body — Notion-style live Markdown formatting -->
           <RichEditor
-            class="mt-4 min-h-0 w-full flex-1 cursor-text overflow-y-auto"
+            class="mt-4 min-h-0 w-full flex-1 cursor-text overflow-y-auto pr-4"
             placeholder="Write today's chapter… Markdown is welcome."
             bind:value={app.draftContent}
           />
