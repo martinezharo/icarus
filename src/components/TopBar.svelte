@@ -22,6 +22,7 @@
     shownCount = 50;
   });
 
+  /** Reveal the next result batch without mounting every hit at once. */
   function showMore() {
     shownCount = Math.min(shownCount + 50, hits.length);
   }

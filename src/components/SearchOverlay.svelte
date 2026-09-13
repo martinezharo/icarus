@@ -25,7 +25,8 @@
   const terms = $derived(splitTerms(query));
   let listEl = $state<HTMLUListElement | null>(null);
 
-  function onscroll() {
+  /** Load another batch whenever the rendered list is still near its end. */
+  function loadMoreIfNeeded() {
     if (!listEl || hits.length >= total) return;
     const remaining = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
     if (remaining < 80) onloadmore();
@@ -33,10 +34,15 @@
 
   $effect(() => {
     void activeIndex;
+    void hits.length;
+    void total;
     requestAnimationFrame(() => {
       listEl
         ?.querySelector<HTMLElement>('[data-active="true"]')
         ?.scrollIntoView({ block: 'nearest' });
+      // This also covers tall viewports where the first batch has no scrollbar
+      // and therefore cannot emit a scroll event to request the next batch.
+      loadMoreIfNeeded();
     });
   });
 </script>
@@ -51,7 +57,7 @@
     <ul
       bind:this={listEl}
       class="max-h-[60vh] overflow-y-auto py-1"
-      onscroll={onscroll}
+      onscroll={loadMoreIfNeeded}
     >
       {#each hits as hit, i (hit.entry.uid)}
         <li>
