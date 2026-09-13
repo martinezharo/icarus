@@ -8,16 +8,23 @@
   let query = $state('');
   let focused = $state(false);
   let activeIndex = $state(0);
+  let shownCount = $state(50);
   let inputEl = $state<HTMLInputElement | null>(null);
 
   const hits = $derived<SearchHit[]>(search(query));
+  const shownHits = $derived(hits.slice(0, shownCount));
   const open = $derived(focused && query.trim().length > 0);
 
   // Keep the active row in range as results change.
   $effect(() => {
-    void hits;
-    if (activeIndex >= hits.length) activeIndex = 0;
+    void query;
+    activeIndex = 0;
+    shownCount = 50;
   });
+
+  function showMore() {
+    shownCount = Math.min(shownCount + 50, hits.length);
+  }
 
   function choose(entry: DiaryEntry) {
     app.jumpToEntry(entry, query);
@@ -32,13 +39,15 @@
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      activeIndex = Math.min(activeIndex + 1, hits.length - 1);
+      const nextIndex = Math.min(activeIndex + 1, hits.length - 1);
+      if (nextIndex >= shownHits.length) showMore();
+      activeIndex = nextIndex;
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       activeIndex = Math.max(activeIndex - 1, 0);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      const hit = hits[activeIndex];
+      const hit = shownHits[activeIndex];
       if (hit) choose(hit.entry);
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -95,7 +104,14 @@
     </div>
 
     {#if open}
-      <SearchOverlay {hits} {activeIndex} {query} onselect={choose} />
+      <SearchOverlay
+        hits={shownHits}
+        total={hits.length}
+        {activeIndex}
+        {query}
+        onloadmore={showMore}
+        onselect={choose}
+      />
     {/if}
   </div>
 

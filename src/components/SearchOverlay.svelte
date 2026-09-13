@@ -8,17 +8,37 @@
 
   let {
     hits,
+    total,
     activeIndex,
     query,
+    onloadmore,
     onselect,
   }: {
     hits: SearchHit[];
+    total: number;
     activeIndex: number;
     query: string;
+    onloadmore: () => void;
     onselect: (entry: DiaryEntry) => void;
   } = $props();
 
   const terms = $derived(splitTerms(query));
+  let listEl = $state<HTMLUListElement | null>(null);
+
+  function onscroll() {
+    if (!listEl || hits.length >= total) return;
+    const remaining = listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
+    if (remaining < 80) onloadmore();
+  }
+
+  $effect(() => {
+    void activeIndex;
+    requestAnimationFrame(() => {
+      listEl
+        ?.querySelector<HTMLElement>('[data-active="true"]')
+        ?.scrollIntoView({ block: 'nearest' });
+    });
+  });
 </script>
 
 <div
@@ -28,34 +48,44 @@
   {#if hits.length === 0}
     <div class="px-4 py-6 text-center text-sm text-muted">No matching entries</div>
   {:else}
-    <ul class="max-h-[60vh] overflow-y-auto py-1">
+    <ul
+      bind:this={listEl}
+      class="max-h-[60vh] overflow-y-auto py-1"
+      onscroll={onscroll}
+    >
       {#each hits as hit, i (hit.entry.uid)}
         <li>
           <button
             class="flex w-full flex-col gap-0.5 px-4 py-2.5 text-left transition-colors
               {i === activeIndex ? 'bg-slate' : 'hover:bg-slate-soft'}"
+            data-active={i === activeIndex}
             onmousedown={(e) => e.preventDefault()}
             onclick={() => onselect(hit.entry)}
           >
-            <span class="flex items-baseline justify-between gap-3">
-              <span class="truncate text-sm font-medium text-text">
-                <Highlight text={hit.entry.title} {terms} />
+            <span class="flex items-start justify-between gap-3">
+              <span class="line-clamp-2 min-w-0 break-words text-sm font-medium text-text [overflow-wrap:anywhere]">
+                <Highlight text={snippetAround(hit.entry.title, terms, 36)} {terms} />
               </span>
               <span class="shrink-0 text-[0.7rem] text-muted">{longDayLabel(hit.entry.date)}</span>
             </span>
             {#if hit.entry.location}
-              <span class="truncate text-xs text-muted">
-                <Highlight text={hit.entry.location} {terms} />
+              <span class="line-clamp-2 break-words text-xs text-muted [overflow-wrap:anywhere]">
+                <Highlight text={snippetAround(hit.entry.location, terms, 36)} {terms} />
               </span>
             {/if}
             {#if hit.entry.content}
-              <span class="truncate text-xs text-muted">
-                <Highlight text={snippetAround(hit.entry.content, terms)} {terms} />
+              <span class="line-clamp-2 break-words text-xs text-muted [overflow-wrap:anywhere]">
+                <Highlight text={snippetAround(hit.entry.content, terms, 36)} {terms} />
               </span>
             {/if}
           </button>
         </li>
       {/each}
+      {#if hits.length < total}
+        <li class="px-4 py-2 text-center text-[0.7rem] text-muted">
+          Showing {hits.length} of {total} results
+        </li>
+      {/if}
     </ul>
   {/if}
 </div>
