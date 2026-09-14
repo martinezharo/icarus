@@ -13,7 +13,13 @@ import type {
   ToastLevel,
 } from './types';
 import { generateUid, parseIcs, serializeIcs } from './ical';
-import { loadDrafts, persistDrafts } from './drafts';
+import {
+  createDraftPersistenceQueue,
+  findEntryDraft,
+  loadDrafts,
+  persistDrafts,
+  upsertDraft,
+} from './drafts';
 import {
   readIcs,
   writeIcsAtomic,
@@ -102,6 +108,8 @@ class AppStore {
 
   // Debounce handle for autosave (plain field — not reactive).
   private draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  // Keep writes ordered so an older, slower save cannot win a race.
+  private persistDraftList = createDraftPersistenceQueue(persistDrafts);
 
   // --- derived ------------------------------------------------------------
   entriesByDay = $derived.by(() => groupByDay(this.entries));
@@ -210,17 +218,27 @@ class AppStore {
       // version first so the edit can be undone.
       const uid = this.editingUid;
       const previous = this.entries.find((e) => e.uid === uid);
-      const updated: DiaryEntry = { ...(previous as DiaryEntry), ...fields };
+      if (!previous) {
+        this.toast('error', 'The original entry is no longer available.');
+        await this.flushDraftNow();
+        return;
+      }
+      const updated: DiaryEntry = { ...previous, ...fields };
       this.entries = this.entries.map((e) => (e.uid === uid ? updated : e));
       indexUpdateEntry(updated);
-      if (this.filePath) await this.persist();
-      if (previous) {
-        const snapshot = { ...previous };
-        this.toast('success', 'Entry updated', {
-          label: 'Undo',
-          run: () => void this.restoreEntry(snapshot),
-        });
+      if (this.filePath && !(await this.persist())) {
+        // Keep the autosaved revision open and restore the committed in-memory
+        // value. A retry can safely attempt the vault write again later.
+        this.entries = this.entries.map((e) => (e.uid === uid ? previous : e));
+        indexUpdateEntry(previous);
+        await this.flushDraftNow();
+        return;
       }
+      const snapshot = { ...previous };
+      this.toast('success', 'Entry updated', {
+        label: 'Undo',
+        run: () => void this.restoreEntry(snapshot),
+      });
     } else {
       const entry: DiaryEntry = { uid: generateUid(), ...fields };
       this.entries = [...this.entries, entry];
@@ -253,16 +271,18 @@ class AppStore {
    * Load an existing committed entry back into the writing dock to revise it.
    * On the next commit the entry is updated in place rather than duplicated.
    */
-  editEntry(entry: DiaryEntry): void {
-    this.cancelDraftSave();
+  async editEntry(entry: DiaryEntry): Promise<void> {
+    // Preserve whatever was already in the writing dock before swapping it.
+    await this.flushDraftNow();
     this.readerFullscreen = false;
     this.editingUid = entry.uid;
-    this.draftId = null;
-    this.draftOpened = false;
-    this.draftTitle = entry.title;
-    this.draftLocation = entry.location ?? '';
-    this.draftContent = entry.content;
-    this.draftDateKey = dateKey(entry.date);
+    const saved = findEntryDraft(this.drafts, entry.uid);
+    this.draftId = saved?.id ?? crypto.randomUUID();
+    this.draftOpened = !!saved;
+    this.draftTitle = saved?.title ?? entry.title;
+    this.draftLocation = saved?.location ?? entry.location ?? '';
+    this.draftContent = saved?.content ?? entry.content;
+    this.draftDateKey = saved?.dateKey ?? dateKey(entry.date);
     this.dockExpanded = true;
   }
 
@@ -337,14 +357,12 @@ class AppStore {
    * Empty editors are ignored so we never persist a blank draft.
    */
   async flushDraft(): Promise<void> {
-    // Revising an existing entry never spawns a draft — the source of truth is
-    // the committed entry itself, so we don't duplicate it in the drafts list.
-    if (this.editingUid) return;
     if (!this.hasEditorContent()) return;
     if (!this.draftId) this.draftId = crypto.randomUUID();
 
     const draft: StoredDraft = {
       id: this.draftId,
+      editingUid: this.editingUid ?? undefined,
       title: this.draftTitle,
       location: this.draftLocation,
       content: this.draftContent,
@@ -352,10 +370,9 @@ class AppStore {
       updatedAt: Date.now(),
     };
 
-    const rest = this.drafts.filter((d) => d.id !== draft.id);
-    this.drafts = [draft, ...rest];
+    this.drafts = upsertDraft(this.drafts, draft);
     try {
-      await persistDrafts(this.drafts);
+      await this.persistDraftList(this.drafts);
     } catch (err) {
       // Persistence unavailable — keep it in memory at least.
       devError('flushDraft: could not persist the draft list', err);
@@ -371,7 +388,7 @@ class AppStore {
   private async removeDraft(id: string): Promise<void> {
     this.drafts = this.drafts.filter((d) => d.id !== id);
     try {
-      await persistDrafts(this.drafts);
+      await this.persistDraftList(this.drafts);
     } catch (err) {
       // ignore — list already updated in memory
       devError('removeDraft: could not persist the draft list', err);
@@ -384,7 +401,10 @@ class AppStore {
     await this.flushDraftNow();
     const d = this.drafts.find((x) => x.id === id);
     if (!d) return;
-    this.editingUid = null;
+    this.editingUid =
+      d.editingUid && this.entries.some((entry) => entry.uid === d.editingUid)
+        ? d.editingUid
+        : null;
     this.draftId = d.id;
     this.draftOpened = true;
     this.draftTitle = d.title;
@@ -496,14 +516,16 @@ class AppStore {
   }
 
   /** Write current entries to `filePath` atomically. Toasts on failure. */
-  private async persist(): Promise<void> {
-    if (!this.filePath) return;
+  private async persist(): Promise<boolean> {
+    if (!this.filePath) return false;
     this.busy = true;
     try {
       await writeIcsAtomic(this.filePath, serializeIcs(this.entries));
       this.toast('success', 'Saved to vault');
+      return true;
     } catch {
       this.toast('error', 'Write failed — your changes are still in memory.');
+      return false;
     } finally {
       this.busy = false;
     }
@@ -557,16 +579,12 @@ class AppStore {
   }
 
   /**
-   * Collapse the writing dock back to its bar. Mid-edit this acts as "cancel"
-   * (the source entry is untouched until commit); otherwise it flushes the
-   * in-progress draft so nothing is lost while collapsed.
+   * Collapse the writing dock back to its bar and flush the current snapshot.
+   * The editor state stays loaded so expanding the dock resumes exactly where
+   * the user left off, including while revising a committed entry.
    */
   collapseDock(): void {
-    if (this.editingUid) {
-      this.resetEditor();
-    } else {
-      void this.flushDraftNow();
-    }
+    void this.flushDraftNow();
     this.dockExpanded = false;
   }
 

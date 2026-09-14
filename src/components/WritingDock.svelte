@@ -122,12 +122,17 @@
           <div class="mt-4 flex items-center justify-between gap-3">
             <div class="flex items-center gap-2">
               {#if app.editingUid}
-                <button
-                  class="rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-slate hover:text-text"
-                  onclick={collapse}
-                >
-                  Cancel
-                </button>
+                <div class="flex items-center gap-2">
+                  <button
+                    class="rounded-lg px-2.5 py-1.5 text-sm font-medium text-muted transition-colors hover:bg-slate hover:text-text"
+                    onclick={collapse}
+                  >
+                    Close
+                  </button>
+                  <span class="hidden text-xs text-muted sm:inline">
+                    Changes autosave to drafts
+                  </span>
+                </div>
               {:else}
                 <DraftsMenu align="left" />
                 {#if app.draftOpened}

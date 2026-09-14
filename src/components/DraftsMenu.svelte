@@ -72,6 +72,11 @@
               <p class="truncate text-sm font-medium text-text">
                 {draft.title.trim() || 'Untitled'}
               </p>
+              {#if draft.editingUid}
+                <p class="text-[0.65rem] font-medium uppercase tracking-wide text-muted">
+                  Entry edit
+                </p>
+              {/if}
               {#if preview(draft.content)}
                 <p class="truncate text-xs text-muted">{preview(draft.content)}</p>
               {/if}
