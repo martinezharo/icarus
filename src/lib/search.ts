@@ -21,6 +21,7 @@ const OPTIONS: import('fuse.js').IFuseOptions<DiaryEntry> = {
     { name: 'content', weight: 0.3 },
   ],
   includeScore: true,
+  ignoreDiacritics: true,
   ignoreLocation: true, // match anywhere in long bodies
   threshold: 0.4,
   minMatchCharLength: 2,
@@ -52,14 +53,13 @@ export function indexUpdateEntry(entry: DiaryEntry): void {
   fuse.add(entry);
 }
 
-/** Query the index. Returns ranked hits (best first); empty if no query/index. */
-export function search(query: string, limit = 12): SearchHit[] {
+/** Query the index. Returns every ranked hit unless an explicit limit is set. */
+export function search(query: string, limit?: number): SearchHit[] {
   const q = query.trim();
   if (!q || !fuse) return [];
 
-  // Over-fetch so we can drop the noisiest fuzzy hits and still fill `limit`.
   const hits = fuse
-    .search(q, { limit: limit * 4 })
+    .search(q)
     .map((r) => ({ entry: r.item, score: r.score ?? 1 }));
 
   // Fuse is intentionally fuzzy, which surfaces entries that don't literally
@@ -75,5 +75,5 @@ export function search(query: string, limit = 12): SearchHit[] {
       )
     : hits;
 
-  return filtered.slice(0, limit);
+  return limit === undefined ? filtered : filtered.slice(0, limit);
 }

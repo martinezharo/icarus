@@ -43,6 +43,21 @@ describe('highlightSegments', () => {
     ]);
   });
 
+  it('marks matches regardless of accents and diaereses', () => {
+    expect(highlightSegments('Canción en MÜNCHEN', ['cancion', 'munchen'])).toEqual([
+      { text: 'Canción', match: true },
+      { text: ' en ', match: false },
+      { text: 'MÜNCHEN', match: true },
+    ]);
+  });
+
+  it('keeps decomposed combining marks inside the highlight', () => {
+    const decomposed = 'cancio\u0301n';
+    expect(highlightSegments(decomposed, ['cancion'])).toEqual([
+      { text: decomposed, match: true },
+    ]);
+  });
+
   it('supports multiple terms (OR semantics)', () => {
     const segs = highlightSegments('the quick brown fox', ['quick', 'fox']);
     const matches = segs.filter((s) => s.match).map((s) => s.text.toLowerCase());
@@ -83,6 +98,11 @@ describe('hasTerm', () => {
     expect(hasTerm('Hello World', ['world'])).toBe(true);
   });
 
+  it('ignores case and letter decorations', () => {
+    expect(hasTerm('Pingüino en Ávila', ['pinguino'])).toBe(true);
+    expect(hasTerm('Pingüino en Ávila', ['avila'])).toBe(true);
+  });
+
   it('returns false when no term appears', () => {
     expect(hasTerm('Hello World', ['foo'])).toBe(false);
   });
@@ -114,6 +134,11 @@ describe('snippetAround', () => {
     const out = snippetAround(text, ['target'], 10);
     expect(out).toContain('TARGET');
     expect(out.length).toBeLessThan(text.length);
+  });
+
+  it('centres snippets around accent-insensitive matches', () => {
+    const out = snippetAround(`${'x'.repeat(50)} CÓRDOBA ${'y'.repeat(50)}`, ['cordoba'], 5);
+    expect(out).toContain('CÓRDOBA');
   });
 
   it('does not add a leading ellipsis when the match is at the start', () => {

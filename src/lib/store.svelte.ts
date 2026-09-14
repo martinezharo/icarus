@@ -178,6 +178,7 @@ class AppStore {
 
   /** "Skip for now" — enter the app with an empty, in-memory canvas. */
   skipToBlank(): void {
+    buildSearchIndex(this.entries);
     this.view = 'main';
     this.ready = true;
   }

@@ -25,6 +25,12 @@
       (entry?.location ? countMatches(entry.location, terms) : 0) +
       contentMatches,
   );
+  const headingMatches = $derived(
+    entry
+      ? countMatches(entry.title, terms) +
+          (entry.location ? countMatches(entry.location, terms) : 0)
+      : 0,
+  );
 
   // On day change, jump to the searched entry (if any) rather than the first.
   $effect(() => {
@@ -37,9 +43,11 @@
   // Scroll the first highlighted hit in the body into view once it's rendered.
   function onBodyHighlight(c: number, first: HTMLElement | null) {
     contentMatches = c;
-    if (first) {
+    // The title and location come before the body. If either matched, keep the
+    // reader at the top so the earliest highlighted result remains visible.
+    if (first && headingMatches === 0) {
       requestAnimationFrame(() =>
-        first.scrollIntoView({ block: 'center', behavior: 'smooth' }),
+        first.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' }),
       );
     }
   }
@@ -158,7 +166,7 @@
       </div>
     {/if}
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-7 pt-6 pb-16">
+    <div class="min-h-0 flex-1 overflow-y-auto px-7 pt-6 pb-16 [scroll-padding-block:2rem]">
       {#if !entry}
         <div class="flex h-full flex-col items-center justify-center text-center text-muted">
           <p class="text-sm">No entries on this day yet.</p>
