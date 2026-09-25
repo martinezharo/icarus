@@ -109,23 +109,47 @@
       </div>
 
       <!-- Preferences -->
-      <div class="mt-5 border-t border-slate pt-5">
-        <p class="mb-2 text-[0.7rem] font-medium uppercase tracking-wider text-muted">
-          Week starts on
-        </p>
-        <div class="grid grid-cols-2 gap-2">
-          {#each weekStartOptions as opt (opt.value)}
-            <button
-              class="rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors
-                {app.weekStart === opt.value
-                  ? 'border-faint bg-slate text-text'
-                  : 'border-slate text-muted hover:bg-slate hover:text-text'}"
-              aria-pressed={app.weekStart === opt.value}
-              onclick={() => app.setWeekStart(opt.value)}
-            >
-              {opt.label}
-            </button>
-          {/each}
+      <div class="mt-5 space-y-5 border-t border-slate pt-5">
+        <div>
+          <p class="mb-2 text-[0.7rem] font-medium uppercase tracking-wider text-muted">
+            Week starts on
+          </p>
+          <div class="grid grid-cols-2 gap-2">
+            {#each weekStartOptions as opt (opt.value)}
+              <button
+                class="rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors
+                  {app.weekStart === opt.value
+                    ? 'border-faint bg-slate text-text'
+                    : 'border-slate text-muted hover:bg-slate hover:text-text'}"
+                aria-pressed={app.weekStart === opt.value}
+                onclick={() => app.setWeekStart(opt.value)}
+              >
+                {opt.label}
+              </button>
+            {/each}
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-4">
+          <span>
+            <span class="block text-sm text-text">Spell check</span>
+            <span class="block text-xs text-muted">Underline misspellings in English</span>
+          </span>
+          <button
+            class="relative h-6 w-11 shrink-0 rounded-full border transition-colors
+              {app.spellcheck
+                ? 'border-faint bg-text'
+                : 'border-slate bg-slate-soft hover:bg-slate'}"
+            role="switch"
+            aria-checked={app.spellcheck}
+            aria-label="Spell check"
+            onclick={() => app.setSpellcheck(!app.spellcheck)}
+          >
+            <span
+              class="absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full transition-all
+                {app.spellcheck ? 'left-[1.45rem] bg-ink' : 'left-1 bg-muted'}"
+            ></span>
+          </button>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { cubicOut } from 'svelte/easing';
   import { app } from '../lib/store.svelte';
-  import { verticalDrag } from '../lib/actions';
+  import { spellCheck, verticalDrag } from '../lib/actions';
   import DraftsMenu from './DraftsMenu.svelte';
   import DatePicker from './DatePicker.svelte';
   import RichEditor from './RichEditor.svelte';
@@ -99,6 +99,7 @@
             class="w-full bg-transparent text-2xl font-semibold tracking-tight text-text placeholder:text-muted focus:outline-none"
             placeholder="Title"
             bind:value={app.draftTitle}
+            use:spellCheck={app.spellcheck}
           />
 
           <!-- Location / subtitle + date -->
@@ -107,6 +108,7 @@
               class="min-w-0 flex-1 bg-transparent text-sm text-muted placeholder:text-muted focus:outline-none"
               placeholder="Add a location or subtitle"
               bind:value={app.draftLocation}
+              use:spellCheck={app.spellcheck}
             />
             <DatePicker bind:value={app.draftDateKey} />
           </div>
