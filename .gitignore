@@ -26,6 +26,11 @@ app-icon.png
 # Logs
 *.log
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+
 # The diary data file lives OUTSIDE this repo by design — never commit it.
 *.ics
 

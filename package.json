@@ -11,6 +11,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "icon": "node scripts/gen-icon.mjs && tauri icon ./app-icon.png",
     "tauri": "tauri",
     "tauri:dev": "WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 tauri dev",
@@ -37,6 +38,7 @@
   "devDependencies": {
     "@fontsource/inter": "^5.1.1",
     "@fontsource/jetbrains-mono": "^5.1.2",
+    "@playwright/test": "^1.63.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@tailwindcss/vite": "^4.0.0",
     "@tauri-apps/cli": "^2",
