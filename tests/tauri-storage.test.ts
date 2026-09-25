@@ -1,0 +1,109 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  files: new Map<string, string>(),
+  selections: [] as (string | null)[],
+  writes: [] as string[],
+  failWrites: new Set<string>(),
+}));
+
+vi.mock('@tauri-apps/api/path', () => ({
+  join: async (...parts: string[]) => parts.join('/').replace(/\/+/, '/'),
+  dirname: async (path: string) => path.slice(0, path.lastIndexOf('/')),
+}));
+
+vi.mock('@tauri-apps/plugin-dialog', () => ({
+  open: async () => mocks.selections.shift() ?? null,
+  save: async () => mocks.selections.shift() ?? null,
+}));
+
+vi.mock('@tauri-apps/plugin-fs', () => ({
+  exists: async (path: string) => mocks.files.has(path),
+  readTextFile: async (path: string) => {
+    const contents = mocks.files.get(path);
+    if (contents === undefined) throw new Error(`Missing file: ${path}`);
+    return contents;
+  },
+  writeTextFile: async (path: string, contents: string) => {
+    if (mocks.failWrites.has(path)) throw new Error('Drive disconnected');
+    mocks.writes.push(path);
+    mocks.files.set(path, contents);
+  },
+  rename: async (from: string, to: string) => {
+    const contents = mocks.files.get(from);
+    if (contents === undefined) throw new Error(`Missing file: ${from}`);
+    mocks.files.set(to, contents);
+    mocks.files.delete(from);
+  },
+  remove: async (path: string) => { mocks.files.delete(path); },
+}));
+
+import { tauriBackend } from '../src/lib/storage/tauri';
+
+beforeEach(async () => {
+  await tauriBackend.rememberVault(null);
+  mocks.files.clear();
+  mocks.selections.length = 0;
+  mocks.writes.length = 0;
+  mocks.failWrites.clear();
+});
+
+describe('desktop diary folder', () => {
+  it('writes the diary, drafts and settings only in the selected folder', async () => {
+    await expect(tauriBackend.setItem('drafts', 'drafts', ['private']))
+      .rejects.toThrow('Choose a diary folder first');
+    expect(await tauriBackend.getRememberedVault()).toBeNull();
+
+    mocks.selections.push('/usb/Journal');
+    const ref = await tauriBackend.pickVaultLocation('diary.ics');
+    expect(ref).toEqual({ kind: 'file', path: '/usb/Journal/diary.ics' });
+    await tauriBackend.rememberVault(ref);
+    await tauriBackend.writeVault(ref!, 'BEGIN:VCALENDAR');
+    await tauriBackend.setItem('drafts', 'drafts', ['private']);
+    await tauriBackend.setItem('settings', 'weekStart', 1);
+
+    expect([...mocks.files.keys()].sort()).toEqual([
+      '/usb/Journal/diary.ics',
+      '/usb/Journal/drafts.json',
+      '/usb/Journal/settings.json',
+    ]);
+    expect(mocks.writes.every((path) => path.startsWith('/usb/Journal/'))).toBe(true);
+    expect(await tauriBackend.getItem('drafts', 'drafts')).toEqual(['private']);
+    expect(await tauriBackend.getRememberedVault()).toBeNull();
+  });
+
+  it('keeps preferences separate when the user switches folders', async () => {
+    await tauriBackend.rememberVault({ kind: 'file', path: '/first/diary.ics' });
+    await tauriBackend.setItem('settings', 'spellcheck', false);
+    await tauriBackend.rememberVault({ kind: 'file', path: '/second/diary.ics' });
+    expect(await tauriBackend.getItem('settings', 'spellcheck')).toBeNull();
+    await tauriBackend.rememberVault({ kind: 'file', path: '/first/diary.ics' });
+    expect(await tauriBackend.getItem('settings', 'spellcheck')).toBe(false);
+  });
+
+  it('serializes settings updates and reports an unavailable drive', async () => {
+    const ref = { kind: 'file' as const, path: '/usb/Journal/diary.ics' };
+    await tauriBackend.rememberVault(ref);
+    await Promise.all([
+      tauriBackend.setItem('settings', 'weekStart', 0),
+      tauriBackend.setItem('settings', 'spellcheck', false),
+    ]);
+    expect(JSON.parse(mocks.files.get('/usb/Journal/settings.json')!)).toEqual({
+      weekStart: 0,
+      spellcheck: false,
+    });
+
+    mocks.failWrites.add('/usb/Journal/diary.ics.tmp');
+    await expect(tauriBackend.writeVault(ref, 'new entry'))
+      .rejects.toThrow('Drive disconnected');
+    expect(mocks.files.has('/usb/Journal/diary.ics.tmp')).toBe(false);
+  });
+
+  it('does not replace an existing diary during import', async () => {
+    mocks.files.set('/source/old.ics', 'existing diary');
+    mocks.files.set('/target/diary.ics', 'keep this diary');
+    mocks.selections.push('/source/old.ics', '/target');
+    await expect(tauriBackend.pickIcsText()).rejects.toThrow('already contains');
+    expect(mocks.files.get('/target/diary.ics')).toBe('keep this diary');
+  });
+});

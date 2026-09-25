@@ -2,8 +2,8 @@
  * Platform-agnostic storage contract.
  *
  * The app is backed by `.ics` content either way, but the medium differs:
- * on desktop Tauri owns a real file on disk, in the browser IndexedDB owns the
- * data. Everything above this layer (stores, components) talks to a
+ * on desktop a user-selected folder owns the diary and settings, while in the
+ * browser IndexedDB owns the data. Everything above this layer talks to a
  * `StorageBackend` and never branches on the platform.
  */
 
@@ -12,16 +12,16 @@ export type VaultRef =
   | { kind: 'file'; path: string }
   | { kind: 'browser' };
 
-/** Key-value namespaces mirroring the two Tauri plugin-store files. */
+/** Key-value namespaces for folder JSON files or browser IndexedDB stores. */
 export type StoreName = 'settings' | 'drafts';
 
 export interface StorageBackend {
   readonly kind: 'tauri' | 'web';
 
   // --- vault lifecycle ----------------------------------------------------
-  /** The vault remembered from a previous session, or null. */
+  /** The vault available on boot, or null until a desktop folder is chosen. */
   getRememberedVault(): Promise<VaultRef | null>;
-  /** Persist the vault to reopen on the next launch; null forgets it. */
+  /** Select the active vault for this session; desktop never remembers its path. */
   rememberVault(ref: VaultRef | null): Promise<void>;
   /** Whether the vault's data is still present. */
   vaultExists(ref: VaultRef): Promise<boolean>;

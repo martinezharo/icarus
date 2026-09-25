@@ -1,12 +1,4 @@
-/**
- * Desktop backend: `.ics` files on disk via Tauri's official plugins
- * (`@tauri-apps/plugin-fs`, `@tauri-apps/plugin-dialog`), plus key-value
- * persistence through `@tauri-apps/plugin-store`.
- *
- * Writes are atomic: we write a sibling `.tmp` file, then rename it over the
- * original. On a single filesystem the rename is atomic, so a crash mid-write
- * can never corrupt the real diary.
- */
+/** Desktop storage. The selected folder owns the diary, drafts and settings. */
 import {
   readTextFile,
   writeTextFile,
@@ -15,38 +7,57 @@ import {
   exists,
 } from '@tauri-apps/plugin-fs';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { load, type Store } from '@tauri-apps/plugin-store';
+import { dirname, join } from '@tauri-apps/api/path';
 import { devError } from '../log';
 import type { StorageBackend, StoreName, VaultRef } from './types';
 
 const ICS_FILTERS = [{ name: 'iCalendar', extensions: ['ics'] }];
-
+const DIARY_FILE = 'diary.ics';
 const STORE_FILES: Record<StoreName, string> = {
   settings: 'settings.json',
   drafts: 'drafts.json',
 };
-const KEY_VAULT_PATH = 'icsPath';
 
-const stores = new Map<StoreName, Promise<Store>>();
+let activeFolder: string | null = null;
+const pendingWrites = new Map<string, Promise<void>>();
 
-function getStore(name: StoreName): Promise<Store> {
-  let promise = stores.get(name);
-  if (!promise) {
-    // `autoSave` debounces writes to disk for us.
-    promise = load(STORE_FILES[name], { defaults: {}, autoSave: true });
-    stores.set(name, promise);
-  }
-  return promise;
+async function pickFolder(): Promise<string | null> {
+  const selected = await open({
+    directory: true,
+    recursive: true,
+    multiple: false,
+    fileAccessMode: 'scoped',
+    title: 'Choose Icarus data folder',
+  });
+  return typeof selected === 'string' ? selected : null;
 }
 
-/** Write `contents` to `path` atomically (.tmp + rename), cleaning up on failure. */
+async function fileInFolder(folder: string): Promise<{ kind: 'file'; path: string }> {
+  return { kind: 'file', path: await join(folder, DIARY_FILE) };
+}
+
+async function destinationForImport(text: string): Promise<{ text: string; ref: VaultRef } | null> {
+  const folder = await pickFolder();
+  if (!folder) return null;
+  const ref = await fileInFolder(folder);
+  if (await exists(ref.path)) {
+    throw new Error('The selected folder already contains diary.ics');
+  }
+  return { text, ref };
+}
+
+function requireFolder(): string {
+  if (!activeFolder) throw new Error('Choose a diary folder first');
+  return activeFolder;
+}
+
+/** Keep the temporary file beside the destination, including on removable media. */
 async function writeAtomic(path: string, contents: string): Promise<void> {
   const tmp = `${path}.tmp`;
   try {
     await writeTextFile(tmp, contents);
     await rename(tmp, path);
   } catch (err) {
-    // Clean up the orphaned temp file; ignore secondary failures.
     try {
       if (await exists(tmp)) await remove(tmp);
     } catch (cleanupErr) {
@@ -56,24 +67,44 @@ async function writeAtomic(path: string, contents: string): Promise<void> {
   }
 }
 
-function fileVault(path: string): VaultRef {
-  return { kind: 'file', path };
+async function readStore(path: string): Promise<Record<string, unknown>> {
+  if (!(await exists(path))) return {};
+  const value: unknown = JSON.parse(await readTextFile(path));
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Invalid Icarus store: ${path}`);
+  }
+  return value as Record<string, unknown>;
+}
+
+async function updateStore(
+  store: StoreName,
+  update: (value: Record<string, unknown>) => void,
+): Promise<void> {
+  const path = await join(requireFolder(), STORE_FILES[store]);
+  const previous = pendingWrites.get(path) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(async () => {
+    const value = await readStore(path);
+    update(value);
+    await writeAtomic(path, JSON.stringify(value));
+  });
+  pendingWrites.set(path, next);
+  try {
+    await next;
+  } finally {
+    if (pendingWrites.get(path) === next) pendingWrites.delete(path);
+  }
 }
 
 export const tauriBackend: StorageBackend = {
   kind: 'tauri',
 
   async getRememberedVault() {
-    const store = await getStore('settings');
-    const path = await store.get<string>(KEY_VAULT_PATH);
-    return path ? fileVault(path) : null;
+    // No path, diary content or preference is stored on the host by Icarus.
+    return null;
   },
 
   async rememberVault(ref) {
-    const store = await getStore('settings');
-    if (ref?.kind === 'file') await store.set(KEY_VAULT_PATH, ref.path);
-    else await store.delete(KEY_VAULT_PATH);
-    await store.save();
+    activeFolder = ref?.kind === 'file' ? await dirname(ref.path) : null;
   },
 
   async vaultExists(ref) {
@@ -81,43 +112,41 @@ export const tauriBackend: StorageBackend = {
   },
 
   async readVault(ref) {
-    if (ref.kind !== 'file') throw new Error('Tauri backend expects a file vault');
+    if (ref.kind !== 'file') throw new Error('Desktop requires a file vault');
     return readTextFile(ref.path);
   },
 
   async writeVault(ref, contents) {
-    if (ref.kind !== 'file') throw new Error('Tauri backend expects a file vault');
+    if (ref.kind !== 'file') throw new Error('Desktop requires a file vault');
+    if ((await dirname(ref.path)) !== requireFolder()) {
+      throw new Error('The diary must be inside the selected folder');
+    }
     await writeAtomic(ref.path, contents);
   },
 
   async forgetVault() {
-    // The diary is a real file outside the app; unlinking never deletes it.
+    // Closing a folder never deletes its files.
   },
 
-  async pickVaultLocation(defaultName) {
-    const path = await save({
-      defaultPath: defaultName,
-      filters: ICS_FILTERS,
-      title: 'Create diary vault',
-    });
-    return path ? fileVault(path) : null;
+  async pickVaultLocation() {
+    const folder = await pickFolder();
+    return folder ? fileInFolder(folder) : null;
   },
 
   async pickIcsText() {
     const selected = await open({
       multiple: false,
       directory: false,
+      fileAccessMode: 'scoped',
       filters: ICS_FILTERS,
       title: 'Import diary (.ics)',
     });
-    // `open` returns string | string[] | null depending on options.
-    const path = typeof selected === 'string' ? selected : null;
-    if (!path) return null;
-    return { text: await readTextFile(path), ref: fileVault(path) };
+    if (typeof selected !== 'string') return null;
+    return destinationForImport(await readTextFile(selected));
   },
 
   async readDroppedPath(path) {
-    return { text: await readTextFile(path), ref: fileVault(path) };
+    return destinationForImport(await readTextFile(path));
   },
 
   async saveIcsCopy(contents, defaultName) {
@@ -127,23 +156,21 @@ export const tauriBackend: StorageBackend = {
       title: 'Export diary',
     });
     if (!path) return false;
-    await writeAtomic(path, contents);
+    await writeTextFile(path, contents);
     return true;
   },
 
   async getItem<T>(store: StoreName, key: string) {
-    return (await (await getStore(store)).get<T>(key)) ?? null;
+    const path = await join(requireFolder(), STORE_FILES[store]);
+    await pendingWrites.get(path);
+    return ((await readStore(path))[key] as T | undefined) ?? null;
   },
 
   async setItem<T>(store: StoreName, key: string, value: T) {
-    const s = await getStore(store);
-    await s.set(key, value);
-    await s.save();
+    await updateStore(store, (items) => { items[key] = value; });
   },
 
   async removeItem(store: StoreName, key: string) {
-    const s = await getStore(store);
-    await s.delete(key);
-    await s.save();
+    await updateStore(store, (items) => { delete items[key]; });
   },
 };

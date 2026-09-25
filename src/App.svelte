@@ -48,8 +48,7 @@
         const win = getCurrentWindow();
         unlistenClose = await win.onCloseRequested(async (event) => {
           event.preventDefault();
-          await app.flushDraftNow();
-          await win.destroy();
+          if (await app.flushDraftNow()) await win.destroy();
         });
       } catch {
         // Not running under Tauri (e.g. `pnpm dev`) — rely on the web handlers.

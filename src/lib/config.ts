@@ -1,6 +1,6 @@
 /**
  * Typed app preferences, persisted through the active storage backend:
- * the Tauri store on desktop, IndexedDB in the browser. Only preferences live
+ * the chosen folder on desktop, IndexedDB in the browser. Only preferences live
  * here — the diary itself lives in the vault.
  */
 import { storage } from './storage';
