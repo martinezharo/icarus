@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   activeFolder: '',
   failDraftWrite: false,
   rejectImport: false,
+  rejectExport: false,
 }));
 
 vi.mock('../src/lib/storage', () => ({
@@ -33,7 +34,13 @@ vi.mock('../src/lib/storage', () => ({
       return null;
     },
     readDroppedPath: async () => null,
-    saveIcsCopy: async () => false,
+    saveIcsCopy: async () => {
+      if (state.rejectExport) {
+        const { BackupExistsError } = await import('../src/lib/storage/errors');
+        throw new BackupExistsError();
+      }
+      return false;
+    },
     getItem: async (store: string, key: string) =>
       state.stores.get(`${state.activeFolder}/${store}/${key}`) ?? null,
     setItem: async (store: string, key: string, value: unknown) => {
@@ -58,6 +65,7 @@ beforeEach(() => {
   state.activeFolder = '';
   state.failDraftWrite = false;
   state.rejectImport = false;
+  state.rejectExport = false;
 });
 
 describe('desktop folder flow', () => {
@@ -111,5 +119,13 @@ describe('desktop folder flow', () => {
     await app.importVault();
     expect(app.vault).toEqual({ kind: 'file', path: '/first/diary.ics' });
     expect(app.toasts.at(-1)?.message).toContain('already has a diary');
+  });
+
+  it('explains why an existing backup cannot be overwritten', async () => {
+    const { app } = await import('../src/lib/store.svelte');
+    state.rejectExport = true;
+
+    await app.exportVault();
+    expect(app.toasts.at(-1)?.message).toBe('Backup already exists. Choose a new filename.');
   });
 });

@@ -21,6 +21,7 @@ import {
   upsertDraft,
 } from './drafts';
 import { storage, type VaultRef } from './storage';
+import { BackupExistsError } from './storage/errors';
 import {
   getSavedWeekStart,
   setSavedWeekStart,
@@ -795,7 +796,7 @@ class AppStore {
       this.toast('success', 'Backup exported.');
       this.settingsOpen = false;
     } catch (err) {
-      this.toast('error', err instanceof Error && err.message.includes('new filename')
+      this.toast('error', err instanceof BackupExistsError
         ? 'Backup already exists. Choose a new filename.'
         : 'Export failed.');
     } finally {

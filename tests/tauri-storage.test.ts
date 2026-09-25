@@ -114,4 +114,10 @@ describe('desktop diary folder', () => {
       .rejects.toThrow('new filename');
     expect(mocks.files.get('/backup/previous.ics')).toBe('previous backup');
   });
+
+  it('exports a backup to a fresh filename', async () => {
+    mocks.selections.push('/backup/new.ics');
+    await expect(tauriBackend.saveIcsCopy('diary content', 'backup.ics')).resolves.toBe(true);
+    expect(mocks.files.get('/backup/new.ics')).toBe('diary content');
+  });
 });

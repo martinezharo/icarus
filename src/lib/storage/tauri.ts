@@ -9,6 +9,7 @@ import {
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { dirname, join } from '@tauri-apps/api/path';
 import { devError } from '../log';
+import { BackupExistsError } from './errors';
 import type { StorageBackend, StoreName, VaultRef } from './types';
 
 const ICS_FILTERS = [{ name: 'iCalendar', extensions: ['ics'] }];
@@ -157,7 +158,7 @@ export const tauriBackend: StorageBackend = {
     });
     if (!path) return false;
     if (await exists(path)) {
-      throw new Error('Choose a new filename for the backup');
+      throw new BackupExistsError();
     }
     await writeTextFile(path, contents);
     return true;
