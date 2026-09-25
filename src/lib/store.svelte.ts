@@ -21,6 +21,7 @@ import {
   upsertDraft,
 } from './drafts';
 import { storage, type VaultRef } from './storage';
+import { BackupExistsError } from './storage/errors';
 import {
   getSavedWeekStart,
   setSavedWeekStart,
@@ -139,8 +140,15 @@ class AppStore {
   );
 
   // --- boot ---------------------------------------------------------------
-  /** Decide the initial screen: reopen the saved vault, or show Welcome. */
+  /** Desktop asks for a folder; browser reopens its IndexedDB vault. */
   async init(): Promise<void> {
+    if (this.storageKind === 'tauri') {
+      // The desktop session has no host-side remembered path or settings.
+      // Pick the data folder before reading any persisted state.
+      this.ready = true;
+      this.view = 'welcome';
+      return;
+    }
     void this.loadDraftsFromDisk();
     void this.loadWeekStart();
     void this.loadSpellcheck();
@@ -193,42 +201,88 @@ class AppStore {
     ref: VaultRef,
     text: string,
     remember: boolean,
+    writeCopy = false,
   ): Promise<boolean> {
     const res = parseIcs(text);
     if (!res.ok) {
       this.toast('error', `Couldn't read this file — ${res.error}`);
       return false;
     }
+    const previousVault = this.vault;
     try {
       if (remember) await storage.rememberVault(ref);
-      if (remember && ref.kind === 'browser') {
+      if (writeCopy) {
+        await storage.writeVault(ref, text);
+      } else if (remember && ref.kind === 'browser') {
         await storage.writeVault(ref, serializeIcs(res.entries));
       }
     } catch (err) {
+      if (remember) await storage.rememberVault(previousVault);
       devError('adoptVault: could not persist the imported diary', err);
-      this.toast('error', 'Could not save the diary in this browser.');
+      this.toast('error', 'Could not save the diary in the selected location.');
       return false;
     }
+    this.cancelDraftSave();
+    this.resetEditor();
     this.entries = res.entries;
     this.vault = ref;
     buildSearchIndex(this.entries);
     this.view = 'main';
     this.ready = true;
+    if (this.storageKind === 'tauri') await this.loadFolderState();
     return true;
+  }
+
+  private async loadFolderState(): Promise<void> {
+    this.drafts = [];
+    this.weekStart = 1;
+    this.spellcheck = true;
+    this.spellWords = [];
+    setUserWords([]);
+    await Promise.all([
+      this.loadDraftsFromDisk(),
+      this.loadWeekStart(),
+      this.loadSpellcheck(),
+      this.loadSpellWords(),
+    ]);
+  }
+
+  /** Open an existing diary folder, or create diary.ics in an empty one. */
+  async openVaultFolder(): Promise<void> {
+    if (this.storageKind !== 'tauri') return;
+    try {
+      if (this.vault && !(await this.flushDraftNow())) return;
+      const ref = await storage.pickVaultLocation('diary.ics');
+      if (!ref) return;
+      if (await storage.vaultExists(ref)) {
+        await this.loadVault(ref);
+      } else {
+        await this.adoptVault(ref, serializeIcs([]), true, true);
+      }
+      this.settingsOpen = false;
+    } catch (err) {
+      devError('openVaultFolder: could not open the folder', err);
+      this.toast('error', 'Could not open that folder.');
+    }
   }
 
   /**
    * Import an `.ics`: pick a file, parse it, and make it the current vault.
-   * On desktop the picked file *is* the vault; in the browser its contents are
-   * copied into IndexedDB.
+   * On desktop the picked file is copied into a chosen folder. In the browser
+   * its contents are copied into IndexedDB.
    */
   async importVault(): Promise<void> {
     this.settingsOpen = false;
-    const picked = await storage.pickIcsText();
-    if (!picked) return;
+    if (this.vault && !(await this.flushDraftNow())) return;
     this.busy = true;
     try {
-      await this.adoptVault(picked.ref, picked.text, true);
+      const picked = await storage.pickIcsText();
+      if (picked) await this.adoptVault(picked.ref, picked.text, true, this.storageKind === 'tauri');
+    } catch (err) {
+      devError('importVault: could not import the diary', err);
+      this.toast('error', err instanceof Error && err.message.includes('already contains diary.ics')
+        ? 'That folder already has a diary. Open the folder instead.'
+        : 'Could not import that diary.');
     } finally {
       this.busy = false;
     }
@@ -242,10 +296,13 @@ class AppStore {
     }
     this.busy = true;
     try {
+      if (this.vault && !(await this.flushDraftNow())) return;
       const picked = await storage.readDroppedPath(path);
-      if (picked) await this.adoptVault(picked.ref, picked.text, true);
-    } catch {
-      this.toast('error', 'Could not open that file.');
+      if (picked) await this.adoptVault(picked.ref, picked.text, true, true);
+    } catch (err) {
+      this.toast('error', err instanceof Error && err.message.includes('already contains diary.ics')
+        ? 'That folder already has a diary. Open the folder instead.'
+        : 'Could not open that file.');
     } finally {
       this.busy = false;
     }
@@ -259,6 +316,7 @@ class AppStore {
     }
     this.busy = true;
     try {
+      if (this.vault && !(await this.flushDraftNow())) return;
       await this.adoptVault({ kind: 'browser' }, await file.text(), true);
     } catch {
       this.toast('error', 'Could not open that file.');
@@ -336,7 +394,12 @@ class AppStore {
           );
         }
       } else {
-        await this.persist();
+        if (!(await this.persist())) {
+          this.entries = this.entries.filter((candidate) => candidate.uid !== entry.uid);
+          indexRemoveEntry(entry.uid);
+          await this.flushDraftNow();
+          return;
+        }
       }
     }
 
@@ -370,13 +433,15 @@ class AppStore {
   }
 
   // --- drafts -------------------------------------------------------------
-  /** Pull persisted drafts into memory on boot (no-op outside Tauri). */
+  /** Pull persisted drafts into memory after the folder is selected. */
   async loadDraftsFromDisk(): Promise<void> {
     try {
       this.drafts = await loadDrafts();
     } catch (err) {
-      // Store plugin unavailable (e.g. plain `vite dev`) — drafts stay empty.
       devError('loadDraftsFromDisk: could not read persisted drafts', err);
+      if (this.storageKind === 'tauri') {
+        this.toast('error', 'Could not read drafts from the diary folder.');
+      }
     }
   }
 
@@ -396,6 +461,7 @@ class AppStore {
       await setSavedWeekStart(weekStart);
     } catch (err) {
       devError('setWeekStart: could not persist the week-start preference', err);
+      this.toast('error', 'Could not save settings to the diary folder.');
     }
   }
 
@@ -415,6 +481,7 @@ class AppStore {
       await setSavedSpellcheck(enabled);
     } catch (err) {
       devError('setSpellcheck: could not persist the spell-check preference', err);
+      this.toast('error', 'Could not save settings to the diary folder.');
     }
   }
 
@@ -433,6 +500,7 @@ class AppStore {
     this.spellWords = addUserWord(word);
     void setSavedSpellWords(this.spellWords).catch((err) => {
       devError('addSpellWord: could not persist the personal dictionary', err);
+      this.toast('error', 'Could not save settings to the diary folder.');
     });
   }
 
@@ -476,8 +544,8 @@ class AppStore {
    * Creates a draft id on first save so subsequent edits update the same one.
    * Empty editors are ignored so we never persist a blank draft.
    */
-  async flushDraft(): Promise<void> {
-    if (!this.hasEditorContent()) return;
+  async flushDraft(): Promise<boolean> {
+    if (!this.hasEditorContent()) return true;
     if (!this.draftId) this.draftId = randomId();
 
     const draft: StoredDraft = {
@@ -493,25 +561,31 @@ class AppStore {
     this.drafts = upsertDraft(this.drafts, draft);
     try {
       await this.persistDraftList(this.drafts);
+      return true;
     } catch (err) {
-      // Persistence unavailable — keep it in memory at least.
       devError('flushDraft: could not persist the draft list', err);
+      this.toast('error', 'Draft not saved — check that the diary folder is available.');
+      return false;
     }
   }
 
   /** Flush immediately (used on collapse / app close). */
-  async flushDraftNow(): Promise<void> {
+  async flushDraftNow(): Promise<boolean> {
     this.cancelDraftSave();
-    await this.flushDraft();
+    return this.flushDraft();
   }
 
-  private async removeDraft(id: string): Promise<void> {
+  private async removeDraft(id: string): Promise<boolean> {
+    const previous = this.drafts;
     this.drafts = this.drafts.filter((d) => d.id !== id);
     try {
       await this.persistDraftList(this.drafts);
+      return true;
     } catch (err) {
-      // ignore — list already updated in memory
+      this.drafts = previous;
       devError('removeDraft: could not persist the draft list', err);
+      this.toast('error', 'Could not update drafts in the diary folder.');
+      return false;
     }
   }
 
@@ -541,7 +615,7 @@ class AppStore {
       this.toast('info', 'Write something first.');
       return;
     }
-    await this.flushDraft();
+    if (!(await this.flushDraft())) return;
     this.resetEditor();
     this.toast('success', 'Saved to drafts');
   }
@@ -558,15 +632,15 @@ class AppStore {
     const id = this.confirmDeleteId;
     this.confirmDeleteId = null;
     if (!id) return;
-    await this.deleteDraft(id);
-    this.toast('info', 'Draft deleted');
+    if (await this.deleteDraft(id)) this.toast('info', 'Draft deleted');
   }
 
   /** Delete a draft; clears the editor (and pending autosave) if it was open. */
-  async deleteDraft(id: string): Promise<void> {
+  async deleteDraft(id: string): Promise<boolean> {
     if (this.draftId === id) this.cancelDraftSave();
-    await this.removeDraft(id);
+    if (!(await this.removeDraft(id))) return false;
     if (this.draftId === id) this.resetEditor();
+    return true;
   }
 
   // --- committed entry deletion -------------------------------------------
@@ -597,8 +671,14 @@ class AppStore {
     const index = this.entries.findIndex((e) => e.uid === uid);
     if (index === -1) return;
     const removed = this.entries[index];
+    const previousEntries = this.entries;
     this.entries = this.entries.filter((e) => e.uid !== uid);
     indexRemoveEntry(uid);
+    if (this.vault && !(await this.persist())) {
+      this.entries = previousEntries;
+      indexAddEntry(removed);
+      return;
+    }
     // If we were editing this entry, drop the editor state.
     if (this.editingUid === uid) this.resetEditor();
     // If the open day no longer has anything or the focused entry is gone,
@@ -607,7 +687,6 @@ class AppStore {
     if (this.selectedKey && this.entriesByDay.get(this.selectedKey)?.length === 0) {
       this.closeDay();
     }
-    if (this.vault) await this.persist();
     this.toast('info', 'Entry deleted', {
       label: 'Undo',
       run: () => void this.restoreEntry(removed, index),
@@ -620,6 +699,7 @@ class AppStore {
    * edit (the entry is still present, so it's swapped back by UID).
    */
   private async restoreEntry(entry: DiaryEntry, index?: number): Promise<void> {
+    const previousEntries = this.entries;
     const exists = this.entries.some((e) => e.uid === entry.uid);
     if (exists) {
       // Revert an edit: swap the current version back to the snapshot.
@@ -632,7 +712,10 @@ class AppStore {
       this.entries = next;
       indexAddEntry(entry);
     }
-    if (this.vault) await this.persist();
+    if (this.vault && !(await this.persist())) {
+      this.entries = previousEntries;
+      buildSearchIndex(previousEntries);
+    }
   }
 
   /** Write current entries to the current vault. Toasts on failure. */
@@ -659,10 +742,17 @@ class AppStore {
   async chooseVaultLocation(): Promise<boolean> {
     const ref = await storage.pickVaultLocation('icarus-diary.ics');
     if (!ref) return false;
+    if (ref.kind === 'file' && await storage.vaultExists(ref)) {
+      this.toast('error', 'That folder already has a diary. Open it instead.');
+      return false;
+    }
+    const previousVault = this.vault;
     this.vault = ref;
     await storage.rememberVault(ref);
-    await this.persist();
-    return true;
+    if (await this.persist()) return true;
+    this.vault = previousVault;
+    await storage.rememberVault(previousVault);
+    return false;
   }
 
   // --- import / export ----------------------------------------------------
@@ -674,10 +764,19 @@ class AppStore {
    * app-owned copy in IndexedDB is deleted.
    */
   async forgetVault(): Promise<void> {
+    if (this.vault && !(await this.flushDraftNow())) return;
     const ref = this.vault;
+    if (ref?.kind === 'browser') {
+      await storage.removeItem('drafts', 'drafts');
+      await storage.removeItem('settings', 'spellWords');
+    }
     if (ref) await storage.forgetVault(ref);
     await storage.rememberVault(null);
     this.entries = [];
+    this.drafts = [];
+    this.resetEditor();
+    this.spellWords = [];
+    setUserWords([]);
     buildSearchIndex(this.entries);
     this.vault = null;
     this.selectedKey = null;
@@ -696,8 +795,10 @@ class AppStore {
       if (!saved) return;
       this.toast('success', 'Backup exported.');
       this.settingsOpen = false;
-    } catch {
-      this.toast('error', 'Export failed.');
+    } catch (err) {
+      this.toast('error', err instanceof BackupExistsError
+        ? 'Backup already exists. Choose a new filename.'
+        : 'Export failed.');
     } finally {
       this.busy = false;
     }

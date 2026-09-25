@@ -1,13 +1,15 @@
 # Icarus Diary
 
-Icarus Diary is a local-first diary backed by a plain `.ics` file. It reads and
-writes `VEVENT` entries at a path you choose; no account, server, or sync
-service is required. The Tauri capability configuration grants local file,
-dialog, and settings-store access without network access.
+Icarus Diary is a local-first diary backed by a plain `.ics` file. On desktop,
+you choose a data folder. Icarus keeps `diary.ics`, `drafts.json`, and
+`settings.json` in that folder, including when it is on removable media. It
+does not remember the folder on the host: choose it again after relaunching.
+No account, server, or sync service is required.
 
 The same frontend runs in a plain browser too: the app detects the runtime and
-swaps the storage backend (`.ics` files on disk via Tauri, IndexedDB in the
-browser) while keeping the `.ics` import/export flow identical.
+swaps the storage backend (the selected folder via Tauri, IndexedDB in the
+browser). Browser mode stores a copy of imported diaries in the browser profile;
+use the desktop app when you want control over the data folder.
 
 Built with Tauri 2, Svelte 5, TypeScript, Vite, and Tailwind CSS.
 
@@ -17,16 +19,41 @@ Built with Tauri 2, Svelte 5, TypeScript, Vite, and Tailwind CSS.
   reader, locations, editing, deletion, and undo.
 - Local fuzzy search across titles, locations, and entry bodies with
   `Ctrl/Cmd + K`.
-- Native `.ics` open/import and backup export; the last opened file is restored
-  on launch.
-- Drafts and week-start preference persisted through the active backend.
+- Desktop folder selection, `.ics` import into that folder, and backup export.
+- Drafts and preferences persisted beside `diary.ics` on desktop.
 - Atomic `.ics` writes on desktop, so a failed save does not replace the
   original file; browser vaults live in IndexedDB and export as `.ics`.
+- A private desktop WebView session to avoid retaining browser profile data
+  between launches.
+- On Linux, GTK and WebKit runtime data uses a private directory in `/dev/shm`
+  that is removed on a normal exit. This also keeps chosen paths out of GTK's
+  persistent recent-files history. The app requires `/dev/shm` to be available.
+
+## Desktop data and privacy
+
+Choose an existing Icarus folder to open its `diary.ics`, or choose an empty
+folder to create one. To bring in an older `.ics`, choose **Import .ics** and
+then an empty destination folder. Import copies the entries into that folder's
+`diary.ics`; it leaves the original file alone. Icarus will not overwrite an
+existing `diary.ics` during import. Backup export also requires a new filename,
+so it cannot overwrite an older backup. Keep the chosen folder connected while
+editing; failed saves leave the current entry or draft open for retry.
+
+Earlier desktop versions stored `drafts.json` and `settings.json` in Tauri's
+application data directory. This release does not read or delete those legacy
+files automatically. If you used an earlier version, close Icarus and copy any
+legacy `drafts.json` and `settings.json` that belong to this diary into the
+chosen folder **before opening it**, provided files with those names are not
+already there. The old `icsPath` setting is ignored. Once you have checked the
+diary and drafts, you can remove the legacy files from the application's old
+data directory. Deleting files does not guarantee physical erasure of earlier
+disk contents. The operating system can also write process memory to swap or
+hibernation storage; choosing an external folder does not control that behavior.
 
 ## Development
 
-Requires Node.js, pnpm, Rust 1.77.2+, and the Linux WebKitGTK 4.1/GTK3
-development libraries for Linux desktop builds.
+Requires Node.js, pnpm, Rust 1.98.1 (pinned in `rust-toolchain.toml`), and the
+Linux WebKitGTK 4.1/GTK3 development libraries for Linux desktop builds.
 
 ```bash
 pnpm install

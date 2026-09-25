@@ -1,6 +1,6 @@
 /**
- * Persistent draft storage through the active backend — the Tauri store on
- * desktop, IndexedDB in the browser. Drafts land in real persisted storage
+ * Persistent draft storage through the active backend — a file in the chosen
+ * desktop folder, or IndexedDB in the browser. Drafts land in persisted storage
  * rather than volatile memory, which is what lets an unsaved entry survive a
  * crash, a power cut, or quitting the app.
  */

@@ -66,13 +66,25 @@
       <h1 class="text-3xl font-semibold tracking-tight text-text">Icarus Diary</h1>
       <p class="mt-3 text-sm leading-relaxed text-muted">
         A quiet, local-first place for your days.<br />
-        Begin by opening an existing diary, or start with a blank canvas.
+        {isDesktop
+          ? 'Choose where your diary, drafts and settings will live.'
+          : 'Begin by opening an existing diary, or start with a blank canvas.'}
       </p>
     </div>
 
+    {#if isDesktop}
+      <button
+        class="mt-10 w-full rounded-xl border border-faint bg-slate-soft px-6 py-4 text-sm font-medium text-text transition-colors hover:bg-slate"
+        onclick={() => app.openVaultFolder()}
+      >
+        Open or create diary folder
+      </button>
+      <p class="mt-2 text-xs text-muted">Your diary, drafts and settings will be saved here.</p>
+    {/if}
+
     <!-- Drop zone / primary action -->
     <button
-      class="group mt-10 flex w-full flex-col items-center gap-4 rounded-2xl border border-dashed px-8 py-10 transition-all duration-300
+      class="group {isDesktop ? 'mt-5' : 'mt-10'} flex w-full flex-col items-center gap-4 rounded-2xl border border-dashed px-8 py-10 transition-all duration-300
         {dragHover
           ? 'scale-[1.01] border-muted bg-slate-soft'
           : 'border-faint hover:border-muted hover:bg-slate-soft/60'}"
@@ -91,19 +103,25 @@
         {dragHover
           ? 'Release to open'
           : isDesktop
-            ? 'Initialize Vault from .ics'
+            ? 'Import an existing .ics'
             : 'Import a diary (.ics)'}
       </span>
-      <span class="text-xs text-muted">Drag &amp; drop a file here, or click to browse</span>
+      <span class="text-xs text-muted">
+        {isDesktop
+          ? 'Choose the .ics, then choose its new data folder'
+          : 'Drag & drop a file here, or click to browse'}
+      </span>
     </button>
 
     <!-- Subtle skip -->
-    <button
-      class="mt-7 text-xs text-muted underline-offset-4 transition-colors hover:text-text hover:underline"
-      onclick={() => app.skipToBlank()}
-      in:fade={{ duration: 600, delay: 420 }}
-    >
-      Skip for now, enter blank canvas
-    </button>
+    {#if !isDesktop}
+      <button
+        class="mt-7 text-xs text-muted underline-offset-4 transition-colors hover:text-text hover:underline"
+        onclick={() => app.skipToBlank()}
+        in:fade={{ duration: 600, delay: 420 }}
+      >
+        Skip for now, enter blank canvas
+      </button>
+    {/if}
   </main>
 </div>

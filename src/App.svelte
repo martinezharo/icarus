@@ -39,8 +39,8 @@
     window.addEventListener('beforeunload', flush);
 
     // The reliable path under Tauri: intercept the window close, finish the
-    // (async) flush, then actually close. Unlike `beforeunload`, this can wait
-    // for the write to complete, so a draft is never lost on quit.
+    // (async) flush, then actually close. If the folder is unavailable, ask
+    // before discarding the unsaved editor content.
     let unlistenClose: (() => void) | undefined;
     void (async () => {
       try {
@@ -48,8 +48,15 @@
         const win = getCurrentWindow();
         unlistenClose = await win.onCloseRequested(async (event) => {
           event.preventDefault();
-          await app.flushDraftNow();
-          await win.destroy();
+          if (await app.flushDraftNow()) {
+            await win.destroy();
+            return;
+          }
+          const { confirm } = await import('@tauri-apps/plugin-dialog');
+          if (await confirm(
+            'The current draft could not be saved to the diary folder. Quit and discard the unsaved changes?',
+            { title: 'Unsaved draft', kind: 'warning' },
+          )) await win.destroy();
         });
       } catch {
         // Not running under Tauri (e.g. `pnpm dev`) — rely on the web handlers.

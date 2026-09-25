@@ -1,6 +1,6 @@
 /**
  * Picks the storage backend once, at module load:
- *  - Tauri desktop → `.ics` files on disk (`./tauri.ts`).
+ *  - Tauri desktop → a user-selected folder (`./tauri.ts`).
  *  - Plain browser → IndexedDB (`./web.ts`), still exportable as `.ics`.
  *  - `pnpm dev:seed` → memory only (`./memory.ts`), preloaded with a sample
  *    diary. The mode check is static, so production builds drop it.
