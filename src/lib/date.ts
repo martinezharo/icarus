@@ -63,6 +63,16 @@ export function longDayLabel(d: Date): string {
   });
 }
 
+/** Compact label for a specific day, e.g. "Thu, Sep 24, 2026". */
+export function shortDayLabel(d: Date): string {
+  return d.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 /** Localised short month names (Jan…Dec), for the header month/year picker. */
 export function monthShortLabels(): string[] {
   return Array.from({ length: 12 }, (_, m) =>
@@ -97,4 +107,27 @@ export function monthGrid(monthStart: Date, weekStart: WeekStart = 1): Date[] {
   return Array.from({ length: 42 }, (_, i) =>
     new Date(start.getFullYear(), start.getMonth(), start.getDate() + i),
   );
+}
+
+/**
+ * The key strictly before (`dir = -1`) or after (`dir = 1`) `key` in an
+ * ascending list of `YYYY-MM-DD` keys, or null at either end. `key` itself
+ * need not be in the list. Binary search keeps this cheap for decades of days.
+ */
+export function adjacentKey(
+  sortedKeys: readonly string[],
+  key: string,
+  dir: -1 | 1,
+): string | null {
+  // First index whose key is > `key` (dir 1) or >= `key` (dir -1).
+  let lo = 0;
+  let hi = sortedKeys.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    const k = sortedKeys[mid];
+    if (dir === 1 ? k <= key : k < key) lo = mid + 1;
+    else hi = mid;
+  }
+  const i = dir === 1 ? lo : lo - 1;
+  return sortedKeys[i] ?? null;
 }

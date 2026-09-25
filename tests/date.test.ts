@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   addMonths,
+  adjacentKey,
   dateKey,
   isSameDay,
   keyToDate,
@@ -171,5 +172,25 @@ describe('monthShortLabels', () => {
     expect(labels).toHaveLength(12);
     expect(new Set(labels).size).toBe(12);
     expect(labels.every((l) => l.length > 0)).toBe(true);
+  });
+});
+
+describe('adjacentKey', () => {
+  const keys = ['2024-01-05', '2025-03-10', '2026-09-24', '2026-09-25'];
+
+  it('finds the neighbouring keys of a listed key', () => {
+    expect(adjacentKey(keys, '2026-09-24', -1)).toBe('2025-03-10');
+    expect(adjacentKey(keys, '2026-09-24', 1)).toBe('2026-09-25');
+  });
+
+  it('finds the neighbours of a key that is not listed', () => {
+    expect(adjacentKey(keys, '2025-12-31', -1)).toBe('2025-03-10');
+    expect(adjacentKey(keys, '2025-12-31', 1)).toBe('2026-09-24');
+  });
+
+  it('returns null past either end', () => {
+    expect(adjacentKey(keys, '2024-01-05', -1)).toBeNull();
+    expect(adjacentKey(keys, '2026-09-25', 1)).toBeNull();
+    expect(adjacentKey([], '2026-09-25', 1)).toBeNull();
   });
 });

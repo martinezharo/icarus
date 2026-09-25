@@ -2,10 +2,12 @@
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { app } from '../lib/store.svelte';
-  import { keyToDate, longDayLabel } from '../lib/date';
+  import { keyToDate } from '../lib/date';
   import { splitTerms, countMatches } from '../lib/highlight';
   import MarkdownView from './MarkdownView.svelte';
   import Highlight from './Highlight.svelte';
+  import DayStepper from './DayStepper.svelte';
+  import EntryPager from './EntryPager.svelte';
 
   const dayDate = $derived(app.selectedKey ? keyToDate(app.selectedKey) : null);
 
@@ -52,10 +54,30 @@
     }
   }
 
-  function go(delta: number) {
-    page = Math.min(Math.max(safePage + delta, 0), count - 1);
+  function isEditable(el: EventTarget | null): boolean {
+    return (
+      el instanceof HTMLElement &&
+      (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))
+    );
+  }
+
+  // Reader shortcuts: ←/→ step between days with entries, Shift+←/→ between
+  // the entries of the open day. Inert while typing or another overlay is up.
+  function onKeydown(e: KeyboardEvent) {
+    if (!app.selectedKey || e.defaultPrevented) return;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    if (app.dockExpanded || app.settingsOpen) return;
+    if (app.confirmDeleteUid || app.confirmDeleteId) return;
+    if (isEditable(e.target)) return;
+    const dir = e.key === 'ArrowLeft' ? -1 : 1;
+    if (e.shiftKey) page = Math.min(Math.max(safePage + dir, 0), Math.max(0, count - 1));
+    else app.stepDay(dir);
+    e.preventDefault();
   }
 </script>
+
+<svelte:window onkeydown={onKeydown} />
 
 {#if app.selectedKey && dayDate}
   <!-- Backdrop -->
@@ -71,21 +93,11 @@
     class="absolute right-0 top-0 z-40 flex h-full w-full max-w-xl flex-col border-l border-slate bg-surface shadow-2xl shadow-black/40"
     transition:fly={{ x: 480, duration: 320, easing: cubicOut }}
   >
-    <header class="flex items-center justify-between border-b border-slate px-7 py-5">
-      <div>
-        <p class="text-[0.7rem] font-medium uppercase tracking-wider text-muted">
-          {#if count > 1}
-            Entry {safePage + 1} of {count}
-          {:else}
-            {count}
-            {count === 1 ? 'entry' : 'entries'}
-          {/if}
-        </p>
-        <h2 class="mt-0.5 text-base font-semibold tracking-tight text-text">
-          {longDayLabel(dayDate)}
-        </h2>
+    <header class="flex items-center justify-between gap-3 border-b border-slate py-5 pr-7 pl-5">
+      <div class="min-w-0">
+        <DayStepper date={dayDate} />
         {#if terms.length}
-          <p class="mt-1 text-[0.7rem] font-medium text-muted">
+          <p class="mt-1 pl-8 text-[0.7rem] font-medium text-muted">
             {#if matchCount > 0}
               <span class="text-text">{matchCount}</span>
               {matchCount === 1 ? 'match' : 'matches'} for “{app.searchHighlight}”
@@ -95,7 +107,7 @@
           </p>
         {/if}
       </div>
-      <div class="flex items-center gap-1">
+      <div class="flex shrink-0 items-center gap-1">
         {#if entry}
           <button
             class="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-slate hover:text-text"
@@ -133,36 +145,8 @@
     </header>
 
     {#if count > 1}
-      <!-- Compact pager: step through the day's entries one at a time. -->
-      <div class="flex items-center justify-center gap-3 px-7 py-2.5">
-        <button
-          class="grid h-6 w-6 place-items-center rounded-md text-muted transition-colors hover:bg-slate hover:text-text disabled:pointer-events-none disabled:opacity-30"
-          aria-label="Previous entry"
-          disabled={safePage === 0}
-          onclick={() => go(-1)}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-        </button>
-
-        <div class="flex items-center gap-1.5">
-          {#each app.selectedEntries as e, i (e.uid)}
-            <button
-              class="h-1.5 rounded-full transition-all {i === safePage ? 'w-4 bg-text' : 'w-1.5 bg-faint hover:bg-muted'}"
-              aria-label={`Go to entry ${i + 1}`}
-              aria-current={i === safePage}
-              onclick={() => (page = i)}
-            ></button>
-          {/each}
-        </div>
-
-        <button
-          class="grid h-6 w-6 place-items-center rounded-md text-muted transition-colors hover:bg-slate hover:text-text disabled:pointer-events-none disabled:opacity-30"
-          aria-label="Next entry"
-          disabled={safePage === count - 1}
-          onclick={() => go(1)}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-        </button>
+      <div class="px-7 py-2.5">
+        <EntryPager entries={app.selectedEntries} bind:page={() => safePage, (v) => (page = v)} />
       </div>
     {/if}
 
@@ -203,9 +187,12 @@
       <div
         class="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate bg-surface/85 px-8 py-4 backdrop-blur"
       >
-        <p class="truncate text-sm text-muted">
-          {longDayLabel(dayDate)}{#if count > 1} · Entry {safePage + 1} of {count}{/if}
-        </p>
+        <div class="min-w-0 -ml-2">
+          <DayStepper date={dayDate} compact />
+        </div>
+        {#if count > 1}
+          <EntryPager entries={app.selectedEntries} bind:page={() => safePage, (v) => (page = v)} />
+        {/if}
         <div class="flex shrink-0 items-center gap-1">
           <button
             class="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-slate hover:text-text"

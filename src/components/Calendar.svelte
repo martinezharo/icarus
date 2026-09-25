@@ -63,6 +63,8 @@
   }
 
   function onDayKeydown(e: KeyboardEvent): void {
+    // While the day pane is open, the arrows belong to its day navigation.
+    if (app.selectedKey) return;
     const base = keyToDate(focusedKey ?? rovingKey);
     // Offset of `base` within its week, honouring the configured week start.
     const dow = (base.getDay() - app.weekStart + 7) % 7;

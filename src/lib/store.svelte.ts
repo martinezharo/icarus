@@ -36,7 +36,7 @@ import {
   indexRemoveEntry,
   indexUpdateEntry,
 } from './search';
-import { addMonths, dateKey, keyToDate, startOfMonth } from './date';
+import { addMonths, adjacentKey, dateKey, keyToDate, startOfMonth } from './date';
 import { addUserWord, setUserWords } from './spellcheck';
 import { randomId } from './random';
 import { devError } from './log';
@@ -124,6 +124,17 @@ class AppStore {
 
   selectedEntries = $derived.by<DiaryEntry[]>(() =>
     this.selectedKey ? (this.entriesByDay.get(this.selectedKey) ?? []) : [],
+  );
+
+  /** Every day that holds an entry, ascending (`YYYY-MM-DD` sorts naturally). */
+  dayKeys = $derived.by<string[]>(() => [...this.entriesByDay.keys()].sort());
+
+  /** Nearest days with entries before/after the open day (null at the ends). */
+  prevDayKey = $derived.by<string | null>(() =>
+    this.selectedKey ? adjacentKey(this.dayKeys, this.selectedKey, -1) : null,
+  );
+  nextDayKey = $derived.by<string | null>(() =>
+    this.selectedKey ? adjacentKey(this.dayKeys, this.selectedKey, 1) : null,
   );
 
   // --- boot ---------------------------------------------------------------
@@ -716,6 +727,17 @@ class AppStore {
     this.clearSearchFocus();
     this.selectedKey = null;
     this.readerFullscreen = false;
+  }
+  /**
+   * Open the previous/next day that has entries, skipping empty days, and keep
+   * the calendar on that day's month.
+   */
+  stepDay(dir: -1 | 1): void {
+    const key = dir === 1 ? this.nextDayKey : this.prevDayKey;
+    if (!key) return;
+    this.clearSearchFocus();
+    this.selectedKey = key;
+    this.currentMonth = startOfMonth(keyToDate(key));
   }
   navigateMonth(delta: number): void {
     this.currentMonth = addMonths(this.currentMonth, delta);
