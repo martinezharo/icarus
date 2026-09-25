@@ -80,6 +80,7 @@ class AppStore {
   /** Shows the currently-read entry full-screen in distraction-free mode. */
   readerFullscreen = $state(false);
   settingsOpen = $state(false);
+  statsOpen = $state(false);
   busy = $state(false);
   toasts = $state<Toast[]>([]);
 
@@ -721,6 +722,12 @@ class AppStore {
   // --- navigation ---------------------------------------------------------
   selectDay(key: string): void {
     this.clearSearchFocus();
+    this.selectedKey = key;
+  }
+  /** Open a specific day and bring the calendar to its month. */
+  openDay(key: string): void {
+    this.clearSearchFocus();
+    this.currentMonth = startOfMonth(keyToDate(key));
     this.selectedKey = key;
   }
   closeDay(): void {

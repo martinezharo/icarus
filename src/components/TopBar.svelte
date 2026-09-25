@@ -116,6 +116,15 @@
     {/if}
   </div>
 
+  <!-- Statistics -->
+  <button
+    class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-slate hover:text-text"
+    aria-label="Statistics"
+    onclick={() => (app.statsOpen = true)}
+  >
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 16v-5"/><path d="M12 16V8"/><path d="M17 16v-3"/></svg>
+  </button>
+
   <!-- Settings -->
   <button
     class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-slate hover:text-text"
