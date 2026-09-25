@@ -33,11 +33,6 @@
     "markdown-it": "^14.1.0",
     "tiptap-markdown": "^0.8.10"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  },
   "devDependencies": {
     "@fontsource/inter": "^5.1.1",
     "@fontsource/jetbrains-mono": "^5.1.2",
