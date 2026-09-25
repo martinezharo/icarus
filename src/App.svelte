@@ -8,6 +8,7 @@
   import DayPane from './components/DayPane.svelte';
   import WritingDock from './components/WritingDock.svelte';
   import SettingsMenu from './components/SettingsMenu.svelte';
+  import StatsModal from './components/StatsModal.svelte';
   import DraftDeleteDialog from './components/DraftDeleteDialog.svelte';
   import EntryDeleteDialog from './components/EntryDeleteDialog.svelte';
   import Toasts from './components/Toasts.svelte';
@@ -18,7 +19,8 @@
     // Global Escape closes the top-most overlay.
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (app.settingsOpen) app.settingsOpen = false;
+      if (app.statsOpen) app.statsOpen = false;
+      else if (app.settingsOpen) app.settingsOpen = false;
       else if (app.dockExpanded) app.collapseDock();
       else if (app.readerFullscreen) app.readerFullscreen = false;
       else if (app.selectedKey) app.closeDay();
@@ -80,6 +82,7 @@
   </main>
   <WritingDock />
   <SettingsMenu />
+  <StatsModal />
 {/if}
 
 <DraftDeleteDialog />
