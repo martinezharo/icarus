@@ -144,7 +144,8 @@
       label: stats.buckets[i].label,
       x: points[i].x,
       // Anchor the outermost labels inward so they never overflow the chart.
-      anchor: i === 0 ? 'start' : i === count - 1 ? 'end' : 'center',
+      anchor:
+        count === 1 ? 'center' : i === 0 ? 'start' : i === count - 1 ? 'end' : 'center',
     }));
   });
 

@@ -62,8 +62,13 @@ export interface DiaryStats {
 const MAX_RANKING = 10;
 /** Beyond this many months, an all-time chart switches to yearly buckets. */
 const MONTHLY_BUCKET_LIMIT = 48;
-/** Hard cap on yearly buckets, so a corrupt far-future date cannot explode. */
-const MAX_YEAR_BUCKETS = 200;
+/**
+ * How far from today a date may sit and still count in an all-time view, in
+ * years. Corrupt dates (a far-future VEVENT, a stray year-0300 entry) are
+ * skipped so they cannot balloon the chart or crowd out the real diary, while
+ * every entry within the window survives however extreme its neighbour is.
+ */
+const MAX_YEARS_FROM_TODAY = 200;
 
 /**
  * Characters that count towards the statistics: the body of an entry. Titles
@@ -126,12 +131,18 @@ function periodRange(
 
   // All time: from the first entry to the latest entry (or today, whichever
   // is later). Entries with an unparseable DTSTART carry the year-9999
-  // sentinel and must not stretch the range (or count as data); without any
-  // real date there is nothing to chart.
+  // sentinel, and a corrupt far-off date (a stray 3000 or 0300 VEVENT) must
+  // not stretch the chart across centuries — both are skipped, so real
+  // entries around today always survive. Without any real date there is
+  // nothing to chart.
+  const minYear = now.getFullYear() - (MAX_YEARS_FROM_TODAY - 1);
+  const maxYear = now.getFullYear() + (MAX_YEARS_FROM_TODAY - 1);
   let first: string | null = null;
   let last: string | null = null;
   for (const entry of entries) {
     if (isInvalidDate(entry.date)) continue;
+    const year = entry.date.getFullYear();
+    if (year < minYear || year > maxYear) continue;
     const key = dateKey(entry.date);
     if (first === null || key < first) first = key;
     if (last === null || key > last) last = key;
@@ -146,15 +157,14 @@ function periodRange(
     (end.getMonth() - firstDate.getMonth()) +
     1;
   const unit: BucketUnit = months > MONTHLY_BUCKET_LIMIT ? 'year' : 'month';
-  let start =
-    unit === 'year'
-      ? new Date(firstDate.getFullYear(), 0, 1)
-      : startOfMonth(firstDate);
-  if (unit === 'year') {
-    const earliest = end.getFullYear() - (MAX_YEAR_BUCKETS - 1);
-    start = new Date(Math.max(start.getFullYear(), earliest), 0, 1);
-  }
-  return { unit, start, end };
+  return {
+    unit,
+    start:
+      unit === 'year'
+        ? new Date(firstDate.getFullYear(), 0, 1)
+        : startOfMonth(firstDate),
+    end,
+  };
 }
 
 function nextBucket(date: Date, unit: BucketUnit): Date {

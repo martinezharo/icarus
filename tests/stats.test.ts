@@ -178,13 +178,31 @@ describe('computeStats — all time', () => {
     expect(stats.bestDay).toBeNull();
   });
 
-  it('caps yearly buckets for absurdly distant dates', () => {
+  it('keeps real history when one date is absurdly far in the future', () => {
     const stats = computeStats(
-      [entry('3000-01-01', 'a'), entry('5000-06-15', 'bb')],
+      [
+        entry('2025-06-01', 'aaa'),
+        entry('2026-09-25', 'bb'),
+        entry('3000-01-01', 'x'.repeat(50)),
+      ],
       'all',
       NOW,
     );
-    expect(stats.buckets).toHaveLength(200);
+    expect(stats.totalEntries).toBe(2);
+    expect(stats.totalChars).toBe(5);
+    expect(stats.buckets[0].key).toBe('2025-06');
+    expect(stats.buckets.at(-1)?.key).toBe('2026-09');
+  });
+
+  it('keeps modern history when one date is absurdly far in the past', () => {
+    const stats = computeStats(
+      [entry('0300-01-01', 'ancient'), entry('2026-09-25', 'bb')],
+      'all',
+      NOW,
+    );
+    expect(stats.totalEntries).toBe(1);
+    expect(stats.totalChars).toBe(2);
+    expect(stats.buckets.map((b) => b.key)).toEqual(['2026-09']);
   });
 });
 
