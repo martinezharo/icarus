@@ -35,7 +35,8 @@ Choose an existing Icarus folder to open its `diary.ics`, or choose an empty
 folder to create one. To bring in an older `.ics`, choose **Import .ics** and
 then an empty destination folder. Import copies the entries into that folder's
 `diary.ics`; it leaves the original file alone. Icarus will not overwrite an
-existing `diary.ics` during import. Keep the chosen folder connected while
+existing `diary.ics` during import. Backup export also requires a new filename,
+so it cannot overwrite an older backup. Keep the chosen folder connected while
 editing; failed saves leave the current entry or draft open for retry.
 
 Earlier desktop versions stored `drafts.json` and `settings.json` in Tauri's

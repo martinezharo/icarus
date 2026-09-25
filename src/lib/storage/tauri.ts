@@ -156,6 +156,9 @@ export const tauriBackend: StorageBackend = {
       title: 'Export diary',
     });
     if (!path) return false;
+    if (await exists(path)) {
+      throw new Error('Choose a new filename for the backup');
+    }
     await writeTextFile(path, contents);
     return true;
   },

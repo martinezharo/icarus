@@ -106,4 +106,12 @@ describe('desktop diary folder', () => {
     await expect(tauriBackend.pickIcsText()).rejects.toThrow('already contains');
     expect(mocks.files.get('/target/diary.ics')).toBe('keep this diary');
   });
+
+  it('does not overwrite an existing backup during export', async () => {
+    mocks.files.set('/backup/previous.ics', 'previous backup');
+    mocks.selections.push('/backup/previous.ics');
+    await expect(tauriBackend.saveIcsCopy('new backup', 'backup.ics'))
+      .rejects.toThrow('new filename');
+    expect(mocks.files.get('/backup/previous.ics')).toBe('previous backup');
+  });
 });

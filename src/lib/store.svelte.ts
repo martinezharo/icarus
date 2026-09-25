@@ -794,8 +794,10 @@ class AppStore {
       if (!saved) return;
       this.toast('success', 'Backup exported.');
       this.settingsOpen = false;
-    } catch {
-      this.toast('error', 'Export failed.');
+    } catch (err) {
+      this.toast('error', err instanceof Error && err.message.includes('new filename')
+        ? 'Backup already exists. Choose a new filename.'
+        : 'Export failed.');
     } finally {
       this.busy = false;
     }
