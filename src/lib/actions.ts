@@ -120,3 +120,20 @@ export function verticalDrag(node: HTMLElement, params: VerticalDragParams) {
     },
   };
 }
+
+/**
+ * Toggle native spell-checking on an editable element — or on a container whose
+ * editable descendants inherit it. The dictionary language is pinned to
+ * English; the platform webview supplies the dictionaries locally.
+ */
+export function spellCheck(node: HTMLElement, enabled: boolean) {
+  function apply(on: boolean) {
+    node.spellcheck = on;
+    node.lang = 'en';
+  }
+  apply(enabled);
+
+  return {
+    update: apply,
+  };
+}

@@ -31,6 +31,13 @@ import {
   getSavedIcsPath,
   setSavedIcsPath,
   clearSavedIcsPath,
+  getSavedWeekStart,
+  setSavedWeekStart,
+  getSavedSpellcheck,
+  setSavedSpellcheck,
+  getSavedSpellWords,
+  setSavedSpellWords,
+  type WeekStart,
 } from './config';
 import {
   buildSearchIndex,
@@ -39,7 +46,7 @@ import {
   indexUpdateEntry,
 } from './search';
 import { addMonths, dateKey, keyToDate, startOfMonth } from './date';
-import { getSavedWeekStart, setSavedWeekStart, type WeekStart } from './config';
+import { addUserWord, setUserWords } from './spellcheck';
 import { devError } from './log';
 
 type View = 'welcome' | 'main';
@@ -84,6 +91,12 @@ class AppStore {
   /** First day of the calendar week (0 = Sunday, 1 = Monday). User preference. */
   weekStart = $state<WeekStart>(1);
 
+  /** Underline misspellings in the writing fields. User preference. */
+  spellcheck = $state(true);
+
+  /** Personal spell-check dictionary (words added from the editor menu). */
+  spellWords = $state<string[]>([]);
+
   // --- draft editor state -------------------------------------------------
   // The live contents of the writing dock. Kept here (not in the component) so
   // it can be autosaved and swapped between drafts from one place.
@@ -123,6 +136,8 @@ class AppStore {
   async init(): Promise<void> {
     void this.loadDraftsFromDisk();
     void this.loadWeekStart();
+    void this.loadSpellcheck();
+    void this.loadSpellWords();
     try {
       const saved = await getSavedIcsPath();
       if (saved && (await exists(saved))) {
@@ -314,6 +329,43 @@ class AppStore {
     } catch (err) {
       devError('setWeekStart: could not persist the week-start preference', err);
     }
+  }
+
+  /** Restore the saved spell-check preference on boot (defaults to on). */
+  async loadSpellcheck(): Promise<void> {
+    try {
+      this.spellcheck = await getSavedSpellcheck();
+    } catch (err) {
+      devError('loadSpellcheck: could not read the spell-check preference', err);
+    }
+  }
+
+  /** Turn native spell-check highlighting on/off and persist it. */
+  async setSpellcheck(enabled: boolean): Promise<void> {
+    this.spellcheck = enabled;
+    try {
+      await setSavedSpellcheck(enabled);
+    } catch (err) {
+      devError('setSpellcheck: could not persist the spell-check preference', err);
+    }
+  }
+
+  /** Restore the personal spell-check dictionary on boot. */
+  async loadSpellWords(): Promise<void> {
+    try {
+      this.spellWords = await getSavedSpellWords();
+      setUserWords(this.spellWords);
+    } catch (err) {
+      devError('loadSpellWords: could not read the personal dictionary', err);
+    }
+  }
+
+  /** Add a word to the personal dictionary and persist the updated list. */
+  addSpellWord(word: string): void {
+    this.spellWords = addUserWord(word);
+    void setSavedSpellWords(this.spellWords).catch((err) => {
+      devError('addSpellWord: could not persist the personal dictionary', err);
+    });
   }
 
   private hasEditorContent(): boolean {

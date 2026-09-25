@@ -239,6 +239,28 @@
     height: 0;
     pointer-events: none;
   }
+
+  /* ---------------------------------------------------------------- */
+  /* Spell check — one look on every platform (see lib/spellcheck.ts)  */
+  /* ---------------------------------------------------------------- */
+  .spell-misspelled {
+    text-decoration-line: underline;
+    text-decoration-style: wavy;
+    text-decoration-color: color-mix(in oklab, #f87171 70%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  /* Native marks (title / location inputs) match where the engine allows
+     restyling them. Kept in its own rule: combining it with the selector
+     above would make browsers that lack this pseudo-element drop both. */
+  ::spelling-error {
+    text-decoration-line: underline;
+    text-decoration-style: wavy;
+    text-decoration-color: color-mix(in oklab, #f87171 70%, transparent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
 }
 
 /* ------------------------------------------------------------------ */
