@@ -2,13 +2,15 @@
   import { fade, scale } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { app } from '../lib/store.svelte';
+  import { vaultFileName } from '../lib/storage';
 
   // Show only the file name in the chip, but keep the full path as a tooltip.
-  const fileName = $derived(
-    app.filePath ? app.filePath.split(/[\\/]/).pop() : null,
-  );
+  const fileName = $derived(vaultFileName(app.vault));
 
-  // Local confirmation step for the destructive "Forget vault" action.
+  // In the browser the vault is app-owned, so "forget" deletes real data.
+  const isBrowserVault = $derived(app.vault?.kind === 'browser');
+
+  // Local confirmation step for the destructive vault action.
   let confirmForget = $state(false);
 
   // Localised long names for the two week-start choices (Sun = index 0).
@@ -51,15 +53,18 @@
         </button>
       </div>
 
-      <!-- Current file -->
+      <!-- Current vault -->
       <div class="mb-5 rounded-lg border border-slate bg-slate-soft px-3.5 py-3">
         <p class="text-[0.7rem] font-medium uppercase tracking-wider text-muted">
-          Current file
+          Current vault
         </p>
-        {#if fileName}
-          <p class="mt-1 truncate text-sm text-text" title={app.filePath}>{fileName}</p>
+        {#if app.vault?.kind === 'file'}
+          <p class="mt-1 truncate text-sm text-text" title={app.vault.path}>{fileName}</p>
+        {:else if isBrowserVault}
+          <p class="mt-1 text-sm text-text">This browser</p>
+          <p class="mt-0.5 text-xs text-muted">Stored locally in IndexedDB — export a backup to keep it safe</p>
         {:else}
-          <p class="mt-1 text-sm text-muted">Blank canvas — not yet saved to a file</p>
+          <p class="mt-1 text-sm text-muted">Blank canvas — not saved yet</p>
         {/if}
         <p class="mt-1 text-xs text-muted">
           {app.entries.length}
@@ -89,11 +94,15 @@
           <svg class="text-muted" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 9l5-5 5 5"/><path d="M12 4v12"/></svg>
           <span>
             <span class="block font-medium">Export backup</span>
-            <span class="block text-xs text-muted">Save a copy to any folder or USB drive</span>
+            <span class="block text-xs text-muted">
+              {isBrowserVault
+                ? 'Download a .ics copy you can keep or re-import'
+                : 'Save a copy to any folder or USB drive'}
+            </span>
           </span>
         </button>
 
-        {#if app.filePath}
+        {#if app.vault}
           <button
             class="flex w-full items-center gap-3 rounded-lg border border-red-400/40 px-3.5 py-3 text-left text-sm text-red-400 transition-colors hover:bg-red-400/10"
             onclick={() => (confirmForget = true)}
@@ -101,8 +110,13 @@
           >
             <svg class="text-red-400/80" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64A9 9 0 1 1 5.64 6.64"/><path d="M12 2v10"/></svg>
             <span>
-              <span class="block font-medium">Forget vault</span>
-              <span class="block text-xs text-red-400/70">Unlink this file — your .ics is not deleted</span>
+              {#if isBrowserVault}
+                <span class="block font-medium">Delete diary</span>
+                <span class="block text-xs text-red-400/70">Erase it from this browser</span>
+              {:else}
+                <span class="block font-medium">Forget vault</span>
+                <span class="block text-xs text-red-400/70">Unlink this file — your .ics is not deleted</span>
+              {/if}
             </span>
           </button>
         {/if}
@@ -171,11 +185,20 @@
         aria-modal="true"
         tabindex="-1"
       >
-        <h2 class="text-base font-semibold tracking-tight text-text">Forget this vault?</h2>
+        <h2 class="text-base font-semibold tracking-tight text-text">
+          {isBrowserVault ? 'Delete this diary?' : 'Forget this vault?'}
+        </h2>
         <p class="mt-2 text-sm text-muted">
-          Icarus will stop opening
-          {#if fileName}<span class="text-text">{fileName}</span>{:else}this file{/if}
-          and return to the welcome screen. Your <code class="text-text">.ics</code> file stays on disk — nothing is deleted.
+          {#if isBrowserVault}
+            All <span class="text-text">{app.entries.length}</span>
+            {app.entries.length === 1 ? 'entry' : 'entries'} stored in this browser
+            will be permanently erased. Export a backup first if you may want them
+            back. This can't be undone.
+          {:else}
+            Icarus will stop opening
+            {#if fileName}<span class="text-text">{fileName}</span>{:else}this file{/if}
+            and return to the welcome screen. Your <code class="text-text">.ics</code> file stays on disk — nothing is deleted.
+          {/if}
         </p>
         <div class="mt-5 flex justify-end gap-2">
           <button
@@ -189,7 +212,7 @@
             onclick={forget}
             disabled={app.busy}
           >
-            Forget vault
+            {isBrowserVault ? 'Delete diary' : 'Forget vault'}
           </button>
         </div>
       </div>

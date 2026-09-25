@@ -7,8 +7,28 @@
 
   let dragHover = $state(false);
 
-  // Native OS file-drop, wired through Tauri's webview drag/drop events.
+  // The two runtimes expose drops differently: Tauri delivers OS paths through
+  // webview events, a plain browser delivers File objects through HTML5 DnD.
+  const isDesktop = app.storageKind === 'tauri';
+
+  function onDragOver(e: DragEvent) {
+    e.preventDefault();
+    dragHover = true;
+  }
+
+  function onDragLeave() {
+    dragHover = false;
+  }
+
+  function onDrop(e: DragEvent) {
+    e.preventDefault();
+    dragHover = false;
+    const file = e.dataTransfer?.files?.[0];
+    if (file) void app.openDroppedFile(file);
+  }
+
   onMount(() => {
+    if (!isDesktop) return;
     let unlisten: (() => void) | undefined;
     getCurrentWebview()
       .onDragDropEvent((event) => {
@@ -56,7 +76,10 @@
         {dragHover
           ? 'scale-[1.01] border-muted bg-slate-soft'
           : 'border-faint hover:border-muted hover:bg-slate-soft/60'}"
-      onclick={() => app.openVaultDialog()}
+      onclick={() => app.importVault()}
+      ondragover={isDesktop ? undefined : onDragOver}
+      ondragleave={isDesktop ? undefined : onDragLeave}
+      ondrop={isDesktop ? undefined : onDrop}
       in:fly={{ y: 18, duration: 700, delay: 240, easing: cubicOut }}
     >
       <span
@@ -65,7 +88,11 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
       </span>
       <span class="text-sm font-medium text-text">
-        {dragHover ? 'Release to open' : 'Initialize Vault from .ics'}
+        {dragHover
+          ? 'Release to open'
+          : isDesktop
+            ? 'Initialize Vault from .ics'
+            : 'Import a diary (.ics)'}
       </span>
       <span class="text-xs text-muted">Drag &amp; drop a file here, or click to browse</span>
     </button>

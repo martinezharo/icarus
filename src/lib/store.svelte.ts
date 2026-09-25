@@ -2,8 +2,8 @@
  * Global application state, built on Svelte 5 runes. A single instance (`app`)
  * is shared across components. It owns the entries, the current view, the
  * calendar position, and all the side-effecting actions (load / commit /
- * import / export) — each of which keeps the in-memory model and the on-disk
- * `.ics` file in sync via an atomic write.
+ * import / export) — each of which keeps the in-memory model and the vault
+ * (a `.ics` file on desktop, IndexedDB in the browser) in sync.
  */
 import type {
   DiaryEntry,
@@ -20,17 +20,8 @@ import {
   persistDrafts,
   upsertDraft,
 } from './drafts';
+import { storage, type VaultRef } from './storage';
 import {
-  readIcs,
-  writeIcsAtomic,
-  exists,
-  pickIcsToOpen,
-  pickIcsToSave,
-} from './fs';
-import {
-  getSavedIcsPath,
-  setSavedIcsPath,
-  clearSavedIcsPath,
   getSavedWeekStart,
   setSavedWeekStart,
   getSavedSpellcheck,
@@ -47,6 +38,7 @@ import {
 } from './search';
 import { addMonths, dateKey, keyToDate, startOfMonth } from './date';
 import { addUserWord, setUserWords } from './spellcheck';
+import { randomId } from './random';
 import { devError } from './log';
 
 type View = 'welcome' | 'main';
@@ -67,7 +59,10 @@ let toastSeq = 0;
 class AppStore {
   // --- core reactive state ------------------------------------------------
   entries = $state<DiaryEntry[]>([]);
-  filePath = $state<string | null>(null);
+  /** Where the diary lives right now (null = blank canvas, memory only). */
+  vault = $state<VaultRef | null>(null);
+  /** Which backend this session runs on — drives platform-aware UI copy. */
+  readonly storageKind: 'tauri' | 'web' = storage.kind;
   view = $state<View>('welcome');
   ready = $state(false); // finished the initial boot check
 
@@ -139,13 +134,13 @@ class AppStore {
     void this.loadSpellcheck();
     void this.loadSpellWords();
     try {
-      const saved = await getSavedIcsPath();
-      if (saved && (await exists(saved))) {
-        const ok = await this.loadFromPath(saved, { remember: false });
+      const saved = await storage.getRememberedVault();
+      if (saved && (await storage.vaultExists(saved))) {
+        const ok = await this.loadVault(saved, { remember: false });
         if (ok) return;
       } else if (saved) {
-        // The remembered file moved or was deleted — forget it gracefully.
-        await clearSavedIcsPath();
+        // The remembered vault moved or was deleted — forget it gracefully.
+        await storage.rememberVault(null);
       }
     } catch (err) {
       // Any boot failure simply falls through to the Welcome screen.
@@ -157,46 +152,107 @@ class AppStore {
   }
 
   // --- vault loading ------------------------------------------------------
-  async loadFromPath(
-    path: string,
+  /**
+   * Read and adopt the vault at `ref`. `remember: false` is used on boot so a
+   * restored vault is not re-persisted.
+   */
+  async loadVault(
+    ref: VaultRef,
     opts: { remember?: boolean } = {},
   ): Promise<boolean> {
     this.busy = true;
     try {
-      const text = await readIcs(path);
-      const res = parseIcs(text);
-      if (!res.ok) {
-        this.toast('error', `Couldn't read this file — ${res.error}`);
-        return false;
-      }
-      this.entries = res.entries;
-      this.filePath = path;
-      buildSearchIndex(this.entries);
-      if (opts.remember !== false) await setSavedIcsPath(path);
-      this.view = 'main';
-      this.ready = true;
-      return true;
+      const text = await storage.readVault(ref);
+      return await this.adoptVault(ref, text, opts.remember !== false);
     } catch {
-      this.toast('error', 'Could not open that file.');
+      this.toast('error', 'Could not open that diary.');
       return false;
     } finally {
       this.busy = false;
     }
   }
 
-  /** Open the native file dialog and load the chosen vault. */
-  async openVaultDialog(): Promise<void> {
-    const path = await pickIcsToOpen();
-    if (path) await this.loadFromPath(path);
+  /**
+   * Replace the in-memory diary with the parsed contents of `text` and make
+   * `ref` the current vault. In the browser there is no source file to keep,
+   * so an adopted vault is materialized into IndexedDB right away.
+   */
+  private async adoptVault(
+    ref: VaultRef,
+    text: string,
+    remember: boolean,
+  ): Promise<boolean> {
+    const res = parseIcs(text);
+    if (!res.ok) {
+      this.toast('error', `Couldn't read this file — ${res.error}`);
+      return false;
+    }
+    try {
+      if (remember) await storage.rememberVault(ref);
+      if (remember && ref.kind === 'browser') {
+        await storage.writeVault(ref, serializeIcs(res.entries));
+      }
+    } catch (err) {
+      devError('adoptVault: could not persist the imported diary', err);
+      this.toast('error', 'Could not save the diary in this browser.');
+      return false;
+    }
+    this.entries = res.entries;
+    this.vault = ref;
+    buildSearchIndex(this.entries);
+    this.view = 'main';
+    this.ready = true;
+    return true;
   }
 
-  /** A file dropped onto the welcome zone. */
+  /**
+   * Import an `.ics`: pick a file, parse it, and make it the current vault.
+   * On desktop the picked file *is* the vault; in the browser its contents are
+   * copied into IndexedDB.
+   */
+  async importVault(): Promise<void> {
+    this.settingsOpen = false;
+    const picked = await storage.pickIcsText();
+    if (!picked) return;
+    this.busy = true;
+    try {
+      await this.adoptVault(picked.ref, picked.text, true);
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  /** An `.ics` dropped onto the welcome zone (desktop path drop). */
   async openDroppedPath(path: string): Promise<void> {
     if (!path.toLowerCase().endsWith('.ics')) {
       this.toast('error', 'Please drop an .ics file.');
       return;
     }
-    await this.loadFromPath(path);
+    this.busy = true;
+    try {
+      const picked = await storage.readDroppedPath(path);
+      if (picked) await this.adoptVault(picked.ref, picked.text, true);
+    } catch {
+      this.toast('error', 'Could not open that file.');
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  /** An `.ics` dropped onto the welcome zone in a browser (File object). */
+  async openDroppedFile(file: File): Promise<void> {
+    if (!file.name.toLowerCase().endsWith('.ics')) {
+      this.toast('error', 'Please drop an .ics file.');
+      return;
+    }
+    this.busy = true;
+    try {
+      await this.adoptVault({ kind: 'browser' }, await file.text(), true);
+    } catch {
+      this.toast('error', 'Could not open that file.');
+    } finally {
+      this.busy = false;
+    }
   }
 
   /** "Skip for now" — enter the app with an empty, in-memory canvas. */
@@ -241,7 +297,7 @@ class AppStore {
       const updated: DiaryEntry = { ...previous, ...fields };
       this.entries = this.entries.map((e) => (e.uid === uid ? updated : e));
       indexUpdateEntry(updated);
-      if (this.filePath && !(await this.persist())) {
+      if (this.vault && !(await this.persist())) {
         // Keep the autosaved revision open and restore the committed in-memory
         // value. A retry can safely attempt the vault write again later.
         this.entries = this.entries.map((e) => (e.uid === uid ? previous : e));
@@ -259,7 +315,7 @@ class AppStore {
       this.entries = [...this.entries, entry];
       indexAddEntry(entry);
 
-      if (!this.filePath) {
+      if (!this.vault) {
         const created = await this.chooseVaultLocation();
         if (!created) {
           this.toast(
@@ -292,7 +348,7 @@ class AppStore {
     this.readerFullscreen = false;
     this.editingUid = entry.uid;
     const saved = findEntryDraft(this.drafts, entry.uid);
-    this.draftId = saved?.id ?? crypto.randomUUID();
+    this.draftId = saved?.id ?? randomId();
     this.draftOpened = !!saved;
     this.draftTitle = saved?.title ?? entry.title;
     this.draftLocation = saved?.location ?? entry.location ?? '';
@@ -410,7 +466,7 @@ class AppStore {
    */
   async flushDraft(): Promise<void> {
     if (!this.hasEditorContent()) return;
-    if (!this.draftId) this.draftId = crypto.randomUUID();
+    if (!this.draftId) this.draftId = randomId();
 
     const draft: StoredDraft = {
       id: this.draftId,
@@ -539,7 +595,7 @@ class AppStore {
     if (this.selectedKey && this.entriesByDay.get(this.selectedKey)?.length === 0) {
       this.closeDay();
     }
-    if (this.filePath) await this.persist();
+    if (this.vault) await this.persist();
     this.toast('info', 'Entry deleted', {
       label: 'Undo',
       run: () => void this.restoreEntry(removed, index),
@@ -564,16 +620,20 @@ class AppStore {
       this.entries = next;
       indexAddEntry(entry);
     }
-    if (this.filePath) await this.persist();
+    if (this.vault) await this.persist();
   }
 
-  /** Write current entries to `filePath` atomically. Toasts on failure. */
+  /** Write current entries to the current vault. Toasts on failure. */
   private async persist(): Promise<boolean> {
-    if (!this.filePath) return false;
+    if (!this.vault) return false;
+    const vault = this.vault;
     this.busy = true;
     try {
-      await writeIcsAtomic(this.filePath, serializeIcs(this.entries));
-      this.toast('success', 'Saved to vault');
+      await storage.writeVault(vault, serializeIcs(this.entries));
+      this.toast(
+        'success',
+        vault.kind === 'browser' ? 'Saved in this browser' : 'Saved to vault',
+      );
       return true;
     } catch {
       this.toast('error', 'Write failed — your changes are still in memory.');
@@ -583,44 +643,45 @@ class AppStore {
     }
   }
 
-  /** Pick a brand-new vault file and persist current entries into it. */
+  /** Pick a home for a brand-new vault and persist current entries into it. */
   async chooseVaultLocation(): Promise<boolean> {
-    const path = await pickIcsToSave();
-    if (!path) return false;
-    this.filePath = path;
-    await setSavedIcsPath(path);
+    const ref = await storage.pickVaultLocation('icarus-diary.ics');
+    if (!ref) return false;
+    this.vault = ref;
+    await storage.rememberVault(ref);
     await this.persist();
     return true;
   }
 
   // --- import / export ----------------------------------------------------
-  async importVault(): Promise<void> {
-    this.settingsOpen = false;
-    await this.openVaultDialog();
-  }
 
   /**
-   * Forget the current vault: drop the remembered path and the in-memory
-   * entries, then return to the Welcome screen. The `.ics` file on disk is
-   * left untouched — only the link to it is removed.
+   * Forget the current vault: drop the remembered link and the in-memory
+   * entries, then return to the Welcome screen. On desktop the `.ics` file on
+   * disk is left untouched — only the link is removed. In the browser the
+   * app-owned copy in IndexedDB is deleted.
    */
   async forgetVault(): Promise<void> {
-    await clearSavedIcsPath();
+    const ref = this.vault;
+    if (ref) await storage.forgetVault(ref);
+    await storage.rememberVault(null);
     this.entries = [];
     buildSearchIndex(this.entries);
-    this.filePath = null;
+    this.vault = null;
     this.selectedKey = null;
     this.settingsOpen = false;
     this.view = 'welcome';
   }
 
-  /** Export a clean backup copy to any location (USB drive, etc.). */
+  /** Export a clean backup copy wherever the user chooses (download on web). */
   async exportVault(): Promise<void> {
-    const path = await pickIcsToSave('icarus-diary-backup.ics');
-    if (!path) return;
     this.busy = true;
     try {
-      await writeIcsAtomic(path, serializeIcs(this.entries));
+      const saved = await storage.saveIcsCopy(
+        serializeIcs(this.entries),
+        'icarus-diary-backup.ics',
+      );
+      if (!saved) return;
       this.toast('success', 'Backup exported.');
       this.settingsOpen = false;
     } catch {

@@ -47,7 +47,11 @@
       <h2 class="text-base font-semibold tracking-tight text-text">Delete entry?</h2>
       <p class="mt-2 text-sm text-muted">
         <span class="text-text">{entry.title.trim() || 'Untitled'}</span>
-        will be permanently removed{app.filePath ? ' from your vault' : ''}. This can't be undone.
+        will be permanently removed{app.vault?.kind === 'browser'
+          ? ' from this browser'
+          : app.vault
+            ? ' from your vault'
+            : ''}. This can't be undone.
       </p>
       <div class="mt-5 flex justify-end gap-2">
         <button

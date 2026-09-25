@@ -6,8 +6,8 @@
 ## Contexto y decisión
 
 Hoy el diario vive en un archivo `.ics` **externo**, en una carpeta que elige el
-usuario (modelo "vault" tipo Obsidian). El `filePath` recordado apunta ahí y la
-app solo guarda esa ruta en `settings.json`. Ver `src/lib/fs.ts`,
+usuario (modelo "vault" tipo Obsidian). La referencia recordada apunta ahí y la
+app solo guarda esa ruta en `settings.json`. Ver `src/lib/storage/`,
 `src/lib/config.ts`, `src/lib/store.svelte.ts`.
 
 **Decisión tomada:** cambiar al modelo "la app es dueña del dato" (tipo Day One /

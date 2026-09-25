@@ -8,16 +8,13 @@
  */
 import ICAL from 'ical.js';
 import type { DiaryEntry, ParseResult } from './types';
+import { randomId } from './random';
 
 const PRODID = '-//Icarus Diary//Local-First Diary//EN';
 
 /** Generate a stable, iCal-style UID for a new entry. */
 export function generateUid(): string {
-  const id =
-    typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
-  return `${id}@icarus.diary`;
+  return `${randomId()}@icarus.diary`;
 }
 
 /** Coerce an ical.js property value to a trimmed string (or undefined). */
