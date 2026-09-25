@@ -135,8 +135,8 @@ function periodRange(
   // not stretch the chart across centuries — both are skipped, so real
   // entries around today always survive. Without any real date there is
   // nothing to chart.
-  const minYear = now.getFullYear() - (MAX_YEARS_FROM_TODAY - 1);
-  const maxYear = now.getFullYear() + (MAX_YEARS_FROM_TODAY - 1);
+  const minYear = now.getFullYear() - MAX_YEARS_FROM_TODAY;
+  const maxYear = now.getFullYear() + MAX_YEARS_FROM_TODAY;
   let first: string | null = null;
   let last: string | null = null;
   for (const entry of entries) {

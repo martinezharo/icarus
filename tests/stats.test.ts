@@ -192,6 +192,8 @@ describe('computeStats — all time', () => {
     expect(stats.totalChars).toBe(5);
     expect(stats.buckets[0].key).toBe('2025-06');
     expect(stats.buckets.at(-1)?.key).toBe('2026-09');
+    expect(stats.bestDay?.key).toBe('2025-06-01');
+    expect(stats.ranking.some((day) => day.key.startsWith('3000'))).toBe(false);
   });
 
   it('keeps modern history when one date is absurdly far in the past', () => {
@@ -203,6 +205,17 @@ describe('computeStats — all time', () => {
     expect(stats.totalEntries).toBe(1);
     expect(stats.totalChars).toBe(2);
     expect(stats.buckets.map((b) => b.key)).toEqual(['2026-09']);
+    expect(stats.ranking.some((day) => day.key.startsWith('0300'))).toBe(false);
+  });
+
+  it('counts dates up to the window edge and drops anything beyond', () => {
+    const edge = computeStats([entry('2226-01-01', 'edge')], 'all', NOW);
+    expect(edge.totalEntries).toBe(1);
+    expect(edge.buckets.map((b) => b.key)).toEqual(['2226-01']);
+
+    const beyond = computeStats([entry('2227-01-01', 'beyond')], 'all', NOW);
+    expect(beyond.totalEntries).toBe(0);
+    expect(beyond.buckets).toEqual([]);
   });
 });
 
