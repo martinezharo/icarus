@@ -2,12 +2,17 @@
  * Picks the storage backend once, at module load:
  *  - Tauri desktop → `.ics` files on disk (`./tauri.ts`).
  *  - Plain browser → IndexedDB (`./web.ts`), still exportable as `.ics`.
+ *  - `pnpm dev:seed` → memory only (`./memory.ts`), preloaded with a sample
+ *    diary. The mode check is static, so production builds drop it.
  *
  * Consumers import `storage` and stay platform-agnostic.
  */
 import { isTauri } from '@tauri-apps/api/core';
 import { tauriBackend } from './tauri';
 import { webBackend } from './web';
+import { createMemoryBackend } from './memory';
+import { serializeIcs } from '../ical';
+import { seedEntries } from '../seed';
 import type { StorageBackend } from './types';
 
 function runningUnderTauri(): boolean {
@@ -17,9 +22,17 @@ function runningUnderTauri(): boolean {
   return '__TAURI_INTERNALS__' in globalThis;
 }
 
-export const storage: StorageBackend = runningUnderTauri()
-  ? tauriBackend
-  : webBackend;
+function platformBackend(): StorageBackend {
+  return runningUnderTauri() ? tauriBackend : webBackend;
+}
+
+export const storage: StorageBackend =
+  import.meta.env.MODE === 'seed'
+    ? createMemoryBackend(
+        serializeIcs(seedEntries(Number(import.meta.env.VITE_SEED_YEARS) || undefined)),
+        platformBackend(),
+      )
+    : platformBackend();
 
 export type { StorageBackend, StoreName, VaultRef } from './types';
 export { vaultFileName } from './types';

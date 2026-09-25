@@ -32,11 +32,18 @@ development libraries for Linux desktop builds.
 pnpm install
 pnpm tauri:dev       # desktop development with hot reload
 pnpm dev             # browser mode on port 1420 (IndexedDB storage)
+pnpm dev:seed        # browser mode with an in-memory sample diary
 pnpm test            # Vitest unit tests
 pnpm test:e2e        # browser-mode end-to-end tests (Playwright)
 pnpm check           # svelte-check and TypeScript
 pnpm tauri:build     # desktop bundle
 ```
+
+`pnpm dev:seed` opens a deterministic sample diary (about three years of
+entries, with gaps and multi-entry days) on an in-memory storage backend:
+edits, drafts and settings are discarded on reload, and the real browser vault
+is never read or written. Set `VITE_SEED_YEARS` for a longer history, e.g.
+`VITE_SEED_YEARS=20 pnpm dev:seed`.
 
 The E2E suite drives the real UI in Chromium. It needs the browser once
 (`pnpm exec playwright install chromium`) and serves the app itself. It runs

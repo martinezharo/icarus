@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
+    "dev:seed": "vite --mode seed",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
