@@ -149,6 +149,43 @@ describe('computeStats — all time', () => {
     expect(stats.buckets.at(-1)?.key).toBe('2026-11');
     expect(stats.totalChars).toBe(4);
   });
+
+  it('ignores entries with an unparseable-date placeholder', () => {
+    const placeholder: DiaryEntry = {
+      uid: 'sentinel@icarus.diary',
+      title: 'Broken date',
+      content: 'x'.repeat(1000),
+      date: new Date(9999, 0, 1),
+    };
+    const stats = computeStats([entry('2026-09-25', 'aaa'), placeholder], 'all', NOW);
+    expect(stats.buckets.at(-1)?.key).toBe('2026-09');
+    expect(stats.buckets.some((b) => b.key.startsWith('9999'))).toBe(false);
+    expect(stats.totalEntries).toBe(1);
+    expect(stats.totalChars).toBe(3);
+    expect(stats.bestDay?.chars).toBe(3);
+  });
+
+  it('has nothing to chart when every date is a placeholder', () => {
+    const placeholder: DiaryEntry = {
+      uid: 'sentinel@icarus.diary',
+      title: 'Broken date',
+      content: 'text',
+      date: new Date(9999, 0, 1),
+    };
+    const stats = computeStats([placeholder], 'all', NOW);
+    expect(stats.buckets).toEqual([]);
+    expect(stats.totalEntries).toBe(0);
+    expect(stats.bestDay).toBeNull();
+  });
+
+  it('caps yearly buckets for absurdly distant dates', () => {
+    const stats = computeStats(
+      [entry('3000-01-01', 'a'), entry('5000-06-15', 'bb')],
+      'all',
+      NOW,
+    );
+    expect(stats.buckets).toHaveLength(200);
+  });
 });
 
 describe('computeStats — day ranking', () => {

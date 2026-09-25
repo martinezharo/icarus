@@ -5,6 +5,7 @@
  */
 import type { DiaryEntry } from './types';
 import { dateKey, keyToDate, longDayLabel, monthLabel } from './date';
+import { isInvalidDate } from './ical';
 
 /** The time windows the statistics modal can show. */
 export type StatsPeriod = '30d' | '12m' | 'year' | 'all';
@@ -61,6 +62,8 @@ export interface DiaryStats {
 const MAX_RANKING = 10;
 /** Beyond this many months, an all-time chart switches to yearly buckets. */
 const MONTHLY_BUCKET_LIMIT = 48;
+/** Hard cap on yearly buckets, so a corrupt far-future date cannot explode. */
+const MAX_YEAR_BUCKETS = 200;
 
 /**
  * Characters that count towards the statistics: the body of an entry. Titles
@@ -122,28 +125,36 @@ function periodRange(
   }
 
   // All time: from the first entry to the latest entry (or today, whichever
-  // is later). Nothing to chart when the diary has never been written.
-  if (entries.length === 0) return null;
-  let first = dateKey(entries[0].date);
-  let last = first;
+  // is later). Entries with an unparseable DTSTART carry the year-9999
+  // sentinel and must not stretch the range (or count as data); without any
+  // real date there is nothing to chart.
+  let first: string | null = null;
+  let last: string | null = null;
   for (const entry of entries) {
+    if (isInvalidDate(entry.date)) continue;
     const key = dateKey(entry.date);
-    if (key < first) first = key;
-    if (key > last) last = key;
+    if (first === null || key < first) first = key;
+    if (last === null || key > last) last = key;
   }
-  const start = startOfMonth(keyToDate(first));
+  if (first === null || last === null) return null;
+
+  const firstDate = keyToDate(first);
   const lastDate = keyToDate(last);
   const end = startOfMonth(lastDate > now ? lastDate : now);
   const months =
-    (end.getFullYear() - start.getFullYear()) * 12 +
-    (end.getMonth() - start.getMonth()) +
+    (end.getFullYear() - firstDate.getFullYear()) * 12 +
+    (end.getMonth() - firstDate.getMonth()) +
     1;
   const unit: BucketUnit = months > MONTHLY_BUCKET_LIMIT ? 'year' : 'month';
-  return {
-    unit,
-    start: unit === 'year' ? new Date(start.getFullYear(), 0, 1) : start,
-    end,
-  };
+  let start =
+    unit === 'year'
+      ? new Date(firstDate.getFullYear(), 0, 1)
+      : startOfMonth(firstDate);
+  if (unit === 'year') {
+    const earliest = end.getFullYear() - (MAX_YEAR_BUCKETS - 1);
+    start = new Date(Math.max(start.getFullYear(), earliest), 0, 1);
+  }
+  return { unit, start, end };
 }
 
 function nextBucket(date: Date, unit: BucketUnit): Date {
@@ -200,6 +211,8 @@ export function computeStats(
   let totalChars = 0;
   if (range) {
     for (const entry of entries) {
+      // Unparseable dates are placeholders, not days the user wrote on.
+      if (isInvalidDate(entry.date)) continue;
       const bucket = byKey.get(bucketKey(entry.date, range.unit));
       if (!bucket) continue; // outside the selected period
 

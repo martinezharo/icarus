@@ -3,7 +3,7 @@
   import { cubicOut } from 'svelte/easing';
   import { fade, scale } from 'svelte/transition';
   import { app } from '../lib/store.svelte';
-  import { clickOutside } from '../lib/actions';
+  import { clickOutside, trapFocus } from '../lib/actions';
   import { shortDayLabel } from '../lib/date';
   import {
     STATS_PERIODS,
@@ -142,7 +142,9 @@
     return [...indices].map((i) => ({
       i,
       label: stats.buckets[i].label,
-      x: Math.min(Math.max(points[i].x, 28), chartWidth - 28),
+      x: points[i].x,
+      // Anchor the outermost labels inward so they never overflow the chart.
+      anchor: i === 0 ? 'start' : i === count - 1 ? 'end' : 'center',
     }));
   });
 
@@ -180,7 +182,8 @@
 
   function barWidth(day: DayStat): number {
     const top = stats.ranking[0]?.chars ?? 0;
-    return top > 0 ? Math.max(2, (day.chars / top) * 100) : 0;
+    if (top <= 0 || day.chars <= 0) return 0;
+    return Math.max(2, (day.chars / top) * 100);
   }
 
   function openDay(day: DayStat) {
@@ -201,6 +204,7 @@
       class="flex max-h-[min(46rem,92vh)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate bg-surface shadow-2xl shadow-black/50"
       transition:scale={{ duration: 200, start: 0.96, easing: cubicOut }}
       onclick={(e) => e.stopPropagation()}
+      use:trapFocus={() => (app.statsOpen = false)}
       role="dialog"
       aria-modal="true"
       aria-label="Statistics"
@@ -452,7 +456,12 @@
               <div class="relative mt-1.5 h-4">
                 {#each xTicks as tick (tick.i)}
                   <span
-                    class="absolute top-0 -translate-x-1/2 text-[0.6rem] whitespace-nowrap text-muted"
+                    class="absolute top-0 text-[0.6rem] whitespace-nowrap text-muted
+                      {tick.anchor === 'center'
+                        ? '-translate-x-1/2'
+                        : tick.anchor === 'end'
+                          ? '-translate-x-full'
+                          : ''}"
                     style:left="{tick.x}px"
                   >
                     {tick.label}
