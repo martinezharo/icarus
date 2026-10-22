@@ -20,10 +20,13 @@ jobs:
       - run: pnpm check
       - run: pnpm test
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps chromium
+      # Ubuntu's hosted image already includes Chrome and its system libraries.
+      # Use it directly so browser checks do not stall on apt/browser downloads.
+      - run: google-chrome --version
       - run: pnpm exec playwright test
         env:
           ICARUS_E2E_HOST: 127.0.0.1
+          ICARUS_E2E_CHANNEL: chrome
 
   desktop:
     runs-on: ubuntu-24.04

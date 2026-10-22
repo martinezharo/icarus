@@ -40,5 +40,13 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [{
+    name: 'chromium',
+    use: {
+      ...devices['Desktop Chrome'],
+      // CI uses the Chrome supplied by the hosted runner; local runs retain
+      // Playwright's bundled Chromium unless explicitly requested otherwise.
+      channel: process.env.ICARUS_E2E_CHANNEL === 'chrome' ? 'chrome' : undefined,
+    },
+  }],
 });
